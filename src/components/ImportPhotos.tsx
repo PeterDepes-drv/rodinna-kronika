@@ -139,8 +139,9 @@ export const ImportPhotos: React.FC<ImportPhotosProps> = ({ onNavigate }) => {
       }, 1500);
     } catch (e) {
       console.error(e);
-      setStatusMessage('Počas importu nastala chyba.');
-      alert('Import zlyhal.');
+      const errMsg = (e as Error).message || 'Neznáma chyba.';
+      setStatusMessage(`Počas importu nastala chyba: ${errMsg}`);
+      alert(`Import zlyhal: ${errMsg}`);
     } finally {
       setImporting(false);
     }

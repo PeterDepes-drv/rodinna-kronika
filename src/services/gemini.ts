@@ -46,6 +46,23 @@ export async function analyzePhoto(base64Image: string, mimeType: string = 'imag
     };
   }
 
+  // Ak bol ako prvý argument odovzdaný URL odkaz (napr. z Google Photos alebo Unsplash), stiahneme ho a prevedieme na Base64
+  let finalBase64 = base64Image;
+  if (base64Image.startsWith('http://') || base64Image.startsWith('https://')) {
+    try {
+      const res = await fetch(base64Image);
+      const blob = await res.blob();
+      finalBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(blob);
+        reader.onload = () => resolve((reader.result as string).split(',')[1]);
+        reader.onerror = reject;
+      });
+    } catch (e) {
+      console.warn('Nepodarilo sa stiahnuť obrázok z URL pre AI analýzu:', e);
+    }
+  }
+
   // --- REÁLNY REŽIM (volanie Gemini API) ---
   try {
     const model = 'gemini-2.5-flash';
@@ -80,7 +97,7 @@ Uisti sa, že vrátiš IBA čistý, platný JSON. Nevracaj žiadne vysvetlenia m
               {
                 inlineData: {
                   mimeType: mimeType,
-                  data: base64Image
+                  data: finalBase64
                 }
               }
             ]
