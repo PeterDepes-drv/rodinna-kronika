@@ -15,7 +15,8 @@ import {
   Monitor, 
   Trash2, 
   Sparkles,
-  CloudDownload
+  CloudDownload,
+  Camera
 } from 'lucide-react';
 
 interface ImportPhotosProps {
@@ -392,15 +393,51 @@ export const ImportPhotos: React.FC<ImportPhotosProps> = ({ onNavigate }) => {
             onClick={() => document.getElementById('local-file-input')?.click()}
           >
             <Upload size={56} style={{ color: 'var(--accent)', marginBottom: '1rem', filter: 'drop-shadow(0 0 8px var(--accent-glow))' }} />
-            <h3 style={{ fontSize: '1.25rem' }}>Potiahnite rodinné fotky sem alebo kliknite pre výber</h3>
+            <h3 style={{ fontSize: '1.25rem' }}>Potiahnite rodinné fotky sem alebo odfotografujte mobilom</h3>
             <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-              Môžete vybrať desiatky až stovky fotografií naraz z galérie mobilu alebo priečinka v počítači.
+              Môžete vybrať fotky z galérie alebo ich priamo odfotiť fotoaparátom tvojho mobilu.
             </p>
+
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '1.5rem', flexWrap: 'wrap' }}>
+              <button 
+                type="button"
+                className="btn btn-primary"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  document.getElementById('mobile-camera-input')?.click();
+                }}
+                style={{ padding: '0.75rem 1.5rem', fontWeight: 600 }}
+              >
+                <Camera size={20} /> Odfotiť mobilom / tabletom
+              </button>
+
+              <button 
+                type="button"
+                className="btn btn-secondary"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  document.getElementById('local-file-input')?.click();
+                }}
+                style={{ padding: '0.75rem 1.5rem' }}
+              >
+                <Image size={20} /> Vybrať z galérie súborov
+              </button>
+            </div>
+
             <input 
               id="local-file-input"
               type="file" 
               multiple 
               accept="image/*" 
+              onChange={handleLocalFileSelect}
+              style={{ display: 'none' }}
+            />
+
+            <input 
+              id="mobile-camera-input"
+              type="file" 
+              accept="image/*" 
+              capture="environment"
               onChange={handleLocalFileSelect}
               style={{ display: 'none' }}
             />
