@@ -162,12 +162,18 @@ class GooglePhotosService {
       throw new Error('Pre otvorenie Google Picker je potrebné prihlásenie.');
     }
 
+    // Extrahovanie čísla projektu z Client ID
+    const projectId = this.clientId ? this.clientId.split('-')[0] : '';
+
     try {
       const pickerBuilder = new (window as any).google.picker.PickerBuilder()
         .addView((window as any).google.picker.ViewId.PHOTOS)
         .addView((window as any).google.picker.ViewId.PHOTO_ALBUMS)
         .setOAuthToken(token);
 
+      if (projectId) {
+        pickerBuilder.setAppId(projectId);
+      }
       if (developerKey) {
         pickerBuilder.setDeveloperKey(developerKey);
       }
