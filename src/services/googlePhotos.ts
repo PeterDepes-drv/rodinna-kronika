@@ -169,7 +169,8 @@ class GooglePhotosService {
       const pickerBuilder = new (window as any).google.picker.PickerBuilder()
         .addView((window as any).google.picker.ViewId.PHOTOS)
         .addView((window as any).google.picker.ViewId.PHOTO_ALBUMS)
-        .setOAuthToken(token);
+        .setOAuthToken(token)
+        .setOrigin(window.location.origin);
 
       if (projectId) {
         pickerBuilder.setAppId(projectId);
