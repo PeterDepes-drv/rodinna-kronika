@@ -164,12 +164,19 @@ class GooglePhotosService {
       });
 
       if (!response.ok) {
+        let errorMsg = `Zlyhalo načítanie fotografií z Google Photos (Kód: ${response.status}).`;
+        try {
+          const errData = await response.json();
+          if (errData.error?.message) {
+            errorMsg = `Google Photos API Chyba: ${errData.error.message}`;
+          }
+        } catch {}
+
         if (response.status === 401) {
-          // Token expiroval, odhlásime sa
           this.logout();
           throw new Error('Vaša relácia Google Photos vypršala. Prihláste sa znova.');
         }
-        throw new Error('Zlyhalo načítanie fotografií z Google Photos.');
+        throw new Error(errorMsg);
       }
 
       const data = await response.json();
@@ -192,10 +199,7 @@ class GooglePhotosService {
       };
     } catch (e) {
       console.error('Chyba Google Photos API:', e);
-      // Fallback na simulované dáta v prípade zlyhania siete/API
-      return {
-        items: SIMULATED_GOOGLE_PHOTOS
-      };
+      throw e; // Vyhodíme reálnu chybu, aby používateľ videl presnú príčinu
     }
   }
 }

@@ -19,6 +19,8 @@ export const ImportPhotos: React.FC<ImportPhotosProps> = ({ onNavigate }) => {
   const [importWithAi, setImportWithAi] = useState(true);
   const [statusMessage, setStatusMessage] = useState('');
 
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   // Načítanie stavu prihlásenia a fotiek
   const checkStatusAndLoad = async () => {
     const status = googlePhotos.getStatus();
@@ -27,10 +29,12 @@ export const ImportPhotos: React.FC<ImportPhotosProps> = ({ onNavigate }) => {
     if (status.authenticated) {
       try {
         setLoading(true);
+        setErrorMessage(null);
         const data = await googlePhotos.getLibraryPhotos();
         setPhotosState(data);
       } catch (e) {
         console.error('Nepodarilo sa načítať knižnicu Google Photos:', e);
+        setErrorMessage((e as Error).message);
       } finally {
         setLoading(false);
       }
@@ -188,6 +192,19 @@ export const ImportPhotos: React.FC<ImportPhotosProps> = ({ onNavigate }) => {
               </button>
             </div>
           </div>
+
+          {errorMessage && (
+            <div className="panel" style={{ marginBottom: '2rem', borderColor: 'var(--danger)', backgroundColor: 'rgba(239, 68, 68, 0.1)' }}>
+              <h4 style={{ color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <AlertCircle size={18} /> Zlyhalo načítanie knižnice Google Photos
+              </h4>
+              <p style={{ color: 'var(--text-primary)', fontSize: '0.9rem' }}>{errorMessage}</p>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+                💡 <strong>Uistite sa, že máte v Google Cloud Console povolenú službu "Photos Library API":</strong><br />
+                Prejdite do <em>Google Cloud Console -&gt; APIs &amp; Services -&gt; Enabled APIs &amp; services -&gt; + ENABLE APIS AND SERVICES</em> a vyhľadajte a povoľte <strong>Photos Library API</strong>.
+              </p>
+            </div>
+          )}
 
           {/* Nastavenie importu s AI */}
           <div className="panel" style={{ marginBottom: '2rem', padding: '1rem 1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
