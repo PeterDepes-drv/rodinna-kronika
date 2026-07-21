@@ -67,7 +67,7 @@ export const Presentations: React.FC<PresentationsProps> = ({ onStartSlideshow, 
       loadAlbumsData();
     } catch (e) {
       console.error(e);
-      alert('Nepodarilo sa vytvoriť album.');
+      alert('Nepodarilo sa vytvoriť album: ' + ((e as Error).message || 'Neznáma chyba.'));
     }
   };
 

@@ -489,7 +489,7 @@ class DatabaseService {
     if (this.isUsingSupabase) {
       const { data, error } = await this.supabase
         .from('people')
-        .insert([person])
+        .insert([newPerson])
         .select();
       if (error) throw error;
       return data[0] as Person;
@@ -591,7 +591,7 @@ class DatabaseService {
     if (this.isUsingSupabase) {
       const { data, error } = await this.supabase
         .from('albums')
-        .insert([{ title, description }])
+        .insert([newAlbum])
         .select();
       if (error) throw error;
       return data[0] as Album;
