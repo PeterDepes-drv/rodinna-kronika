@@ -287,6 +287,44 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
     }
   };
 
+  const handleAIGenerateForExisting = async () => {
+    if (!selectedPhoto) return;
+    try {
+      setAiAnalyzing(true);
+      setAiError(null);
+
+      const aiResult = await analyzePhoto(selectedPhoto.storage_path);
+
+      let guessedDecade = 1980;
+      if (aiResult.estimated_year) {
+        const match = aiResult.estimated_year.match(/\d{4}/);
+        if (match) {
+          guessedDecade = Math.floor(parseInt(match[0]) / 10) * 10;
+        }
+      }
+
+      setFormData(prev => ({
+        ...prev,
+        description: aiResult.description || prev.description,
+        tags: aiResult.tags || prev.tags,
+        decade: guessedDecade || prev.decade,
+        taken_at: prev.taken_at || (aiResult.estimated_year?.match(/\d{4}/) ? aiResult.estimated_year.match(/\d{4}/)![0] : prev.taken_at),
+        location: prev.location
+      }));
+
+      // Uložíme AI výsledok do metadát formulára
+      (formData as any).ai_metadata = aiResult;
+
+      alert('Gemini AI úspešne zanalyzovala fotografiu a doplnila údaje do formulára!');
+    } catch (e) {
+      console.error(e);
+      setAiError('Zlyhala AI analýza spomienky.');
+      alert('Nepodarilo sa spustiť AI analýzu. Skontrolujte nastavenie Gemini kľúča.');
+    } finally {
+      setAiAnalyzing(false);
+    }
+  };
+
   const handlePeopleCheckboxChange = (personId: string) => {
     setFormData(prev => {
       const alreadyTagged = prev.people.includes(personId);
@@ -978,9 +1016,35 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
                 </div>
 
                 <div>
-                  <div className="meta-item-label" style={{ marginBottom: '0.5rem' }}>Príbeh / Popis spomienky</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <div className="meta-item-label">Príbeh / Popis spomienky</div>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{
+                        fontSize: '0.75rem',
+                        padding: '0.25rem 0.5rem',
+                        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.15) 100%)',
+                        borderColor: 'rgba(139, 92, 246, 0.3)',
+                        color: '#c084fc',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.25rem'
+                      }}
+                      disabled={aiAnalyzing}
+                      onClick={async () => {
+                        handleEnterEditMode();
+                        setTimeout(() => {
+                          handleAIGenerateForExisting();
+                        }, 150);
+                      }}
+                      title="Spustiť Gemini AI na rozpoznanie textov, dátumu, lokality a príbehu tejto fotografie"
+                    >
+                      <Brain size={12} /> {aiAnalyzing ? 'Analyzujem...' : 'Doplniť cez Gemini AI'}
+                    </button>
+                  </div>
                   <p style={{ color: 'var(--text-primary)', whiteSpace: 'pre-line', fontSize: '0.95rem' }}>
-                    {selectedPhoto.description || 'Táto fotografia zatiaľ nemá priradený príbeh. Môžete ho doplniť kliknutím na Editovať.'}
+                    {selectedPhoto.description || 'Táto fotografia zatiaľ nemá priradený príbeh. Kliknutím na tlačidlo vyššie môžete spustiť Gemini AI analýzu.'}
                   </p>
                 </div>
 
@@ -1106,12 +1170,34 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
                   />
                 </div>
 
-                <div className="form-group">
-                  <label>Príbeh / Popis spomienky</label>
+                 <div className="form-group">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                    <label style={{ margin: 0 }}>Príbeh / Popis spomienky</label>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{
+                        fontSize: '0.75rem',
+                        padding: '0.25rem 0.5rem',
+                        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.15) 100%)',
+                        borderColor: 'rgba(139, 92, 246, 0.3)',
+                        color: '#c084fc',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.25rem'
+                      }}
+                      disabled={aiAnalyzing}
+                      onClick={handleAIGenerateForExisting}
+                      title="Spustiť Gemini AI na rozpoznanie textov, dátumu, lokality a príbehu tejto fotografie"
+                    >
+                      <Brain size={12} /> {aiAnalyzing ? 'Analyzujem...' : 'Doplniť cez Gemini AI'}
+                    </button>
+                  </div>
                   <textarea 
                     className="textarea-field"
                     value={formData.description}
                     onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="Popis spomienky..."
                   />
                 </div>
 
