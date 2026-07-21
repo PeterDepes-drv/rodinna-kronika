@@ -414,6 +414,60 @@ class DatabaseService {
     }
   }
 
+  async bulkUpdatePhotoPeople(photoIds: string[], personIds: string[], action: 'add' | 'remove'): Promise<void> {
+    if (this.isUsingSupabase) {
+      for (const photoId of photoIds) {
+        // Získanie súčasných relácií pre danú fotografiu
+        const { data: currentRelations } = await this.supabase
+          .from('photo_people')
+          .select('person_id')
+          .eq('photo_id', photoId);
+          
+        const currentPersonIds = currentRelations ? currentRelations.map((r: any) => r.person_id) : [];
+        
+        let newPersonIds = [...currentPersonIds];
+        if (action === 'add') {
+          personIds.forEach(pid => {
+            if (!newPersonIds.includes(pid)) {
+              newPersonIds.push(pid);
+            }
+          });
+        } else {
+          newPersonIds = newPersonIds.filter(pid => !personIds.includes(pid));
+        }
+        
+        // Vymazať relácie
+        await this.supabase.from('photo_people').delete().eq('photo_id', photoId);
+        
+        // Vložiť znova
+        if (newPersonIds.length > 0) {
+          const relations = newPersonIds.map((pid: string) => ({
+            photo_id: photoId,
+            person_id: pid
+          }));
+          await this.supabase.from('photo_people').insert(relations);
+        }
+      }
+    } else {
+      const photos = await this.getPhotos();
+      const updatedPhotos = photos.map(p => {
+        if (photoIds.includes(p.id)) {
+          let newPeople = p.people ? [...p.people] : [];
+          if (action === 'add') {
+            personIds.forEach(pid => {
+              if (!newPeople.includes(pid)) newPeople.push(pid);
+            });
+          } else {
+            newPeople = newPeople.filter(pid => !personIds.includes(pid));
+          }
+          return { ...p, people: newPeople };
+        }
+        return p;
+      });
+      localStorage.setItem('kronika_photos', JSON.stringify(updatedPhotos));
+    }
+  }
+
   async deletePhoto(id: string): Promise<void> {
     if (this.isUsingSupabase) {
       const { error } = await this.supabase.from('photos').delete().eq('id', id);

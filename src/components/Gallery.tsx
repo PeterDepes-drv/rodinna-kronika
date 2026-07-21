@@ -94,6 +94,11 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
 
+  // Hromadné označovanie
+  const [isBulkMode, setIsBulkMode] = useState(false);
+  const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([]);
+  const [bulkPeopleToUpdate, setBulkPeopleToUpdate] = useState<string[]>([]);
+
   // AI loading
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -111,6 +116,31 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
     tags: [] as string[]
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  const handleBulkTagAction = async (action: 'add' | 'remove') => {
+    if (selectedPhotoIds.length === 0) {
+      alert('Najprv vyberte aspoň jednu fotografiu kliknutím na ňu.');
+      return;
+    }
+    if (bulkPeopleToUpdate.length === 0) {
+      alert('Vyberte aspoň jedného člena rodiny.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await db.bulkUpdatePhotoPeople(selectedPhotoIds, bulkPeopleToUpdate, action);
+      setSelectedPhotoIds([]);
+      setBulkPeopleToUpdate([]);
+      await loadData();
+      alert('Zmeny boli úspešne uložené.');
+    } catch (e) {
+      console.error('Chyba pri hromadnej úprave:', e);
+      alert('Nepodarilo sa vykonať hromadnú úpravu.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Načítanie všetkých fotiek a ľudí
   const loadData = async () => {
@@ -441,9 +471,23 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
           <h1>Rodinný archív</h1>
           <p>Prehliadajte, filtrujte a popisujte rodinné spomienky.</p>
         </div>
-        <button className="btn btn-primary" onClick={handleOpenAddModal}>
-          <Plus size={18} /> Pridať spomienku
-        </button>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <button 
+            className={`btn ${isBulkMode ? 'btn-primary' : 'btn-secondary'}`} 
+            onClick={() => {
+              setIsBulkMode(!isBulkMode);
+              setSelectedPhotoIds([]);
+              setBulkPeopleToUpdate([]);
+            }}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600 }}
+          >
+            <Users size={16} /> 
+            {isBulkMode ? 'Zrušiť hromadný režim' : 'Hromadné označovanie ľudí'}
+          </button>
+          <button className="btn btn-primary" onClick={handleOpenAddModal}>
+            <Plus size={18} /> Pridať spomienku
+          </button>
+        </div>
       </div>
 
       {/* Riadok s filtrami */}
@@ -515,29 +559,166 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
         </div>
       ) : (
         <div className="gallery-grid">
-          {filteredPhotos.map(photo => (
-            <div 
-              key={photo.id} 
-              className="photo-card"
-              onClick={() => onSelectPhoto(photo)}
-            >
-              <div className="photo-wrapper">
-                <img src={photo.storage_path} alt={photo.title} className="photo-img" />
-                <span className="photo-badge">{photo.decade}s</span>
-              </div>
-              <div className="photo-card-info">
-                <h3 className="photo-title">{photo.title}</h3>
-                <div className="photo-meta">
-                  <span>{formatDate(photo.taken_at)}</span>
-                  {photo.location && (
-                    <span className="photo-location">
-                      <MapPin size={12} /> {photo.location}
-                    </span>
+          {filteredPhotos.map(photo => {
+            const isSelected = selectedPhotoIds.includes(photo.id);
+            return (
+              <div 
+                key={photo.id} 
+                className={`photo-card ${isBulkMode ? 'bulk-active' : ''} ${isSelected ? 'selected' : ''}`}
+                onClick={() => {
+                  if (isBulkMode) {
+                    setSelectedPhotoIds(prev => 
+                      prev.includes(photo.id) 
+                        ? prev.filter(id => id !== photo.id) 
+                        : [...prev, photo.id]
+                    );
+                  } else {
+                    onSelectPhoto(photo);
+                  }
+                }}
+                style={isSelected ? { border: '2px solid var(--accent)', boxShadow: '0 0 15px rgba(167, 139, 250, 0.4)' } : undefined}
+              >
+                <div className="photo-wrapper" style={{ position: 'relative' }}>
+                  <img src={photo.storage_path} alt={photo.title} className="photo-img" />
+                  <span className="photo-badge">{photo.decade}s</span>
+                  {isBulkMode && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '0.75rem',
+                      left: '0.75rem',
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      backgroundColor: isSelected ? 'var(--accent)' : 'rgba(0,0,0,0.5)',
+                      border: '2px solid white',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white',
+                      fontWeight: 'bold',
+                      fontSize: '0.8rem',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
+                    }}>
+                      {isSelected ? '✓' : ''}
+                    </div>
                   )}
                 </div>
+                <div className="photo-card-info">
+                  <h3 className="photo-title">{photo.title}</h3>
+                  <div className="photo-meta">
+                    <span>{formatDate(photo.taken_at)}</span>
+                    {photo.location && (
+                      <span className="photo-location">
+                        <MapPin size={12} /> {photo.location}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* SPOJOVACÍ PANEL HROMADNÝCH ÚPRAV */}
+      {isBulkMode && (
+        <div style={{
+          position: 'fixed',
+          bottom: '1.5rem',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: 'min(90%, 800px)',
+          backgroundColor: 'rgba(23, 23, 27, 0.95)',
+          border: '1px solid rgba(167, 139, 250, 0.3)',
+          borderRadius: '16px',
+          padding: '1.25rem',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6)',
+          backdropFilter: 'blur(12px)',
+          zIndex: 1000,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1rem',
+          color: 'white'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent)' }}>
+                <Users size={16} /> Hromadné priraďovanie členov rodiny
+              </h3>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
+                Vybraných fotografií: <strong style={{ color: 'white' }}>{selectedPhotoIds.length}</strong>
+              </p>
             </div>
-          ))}
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button 
+                className="btn btn-secondary" 
+                style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem' }}
+                onClick={() => setSelectedPhotoIds(filteredPhotos.map(p => p.id))}
+              >
+                Vybrať všetky zobrazené
+              </button>
+              <button 
+                className="btn btn-secondary" 
+                style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem' }}
+                onClick={() => setSelectedPhotoIds([])}
+              >
+                Zrušiť výber
+              </button>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.75rem' }}>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Vyberte rodinu:</span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', flex: 1 }}>
+              {people.map(p => {
+                const isChecked = bulkPeopleToUpdate.includes(p.id);
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => {
+                      setBulkPeopleToUpdate(prev => 
+                        prev.includes(p.id) 
+                          ? prev.filter(id => id !== p.id) 
+                          : [...prev, p.id]
+                      );
+                    }}
+                    className={`tag-badge ${isChecked ? 'tag-badge-accent' : ''}`}
+                    style={{ 
+                      cursor: 'pointer',
+                      padding: '0.35rem 0.75rem',
+                      fontSize: '0.8rem',
+                      backgroundColor: isChecked ? 'var(--accent)' : 'rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      color: isChecked ? 'white' : 'var(--text-primary)',
+                      borderRadius: '8px'
+                    }}
+                  >
+                    {p.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.25rem' }}>
+            <button 
+              className="btn btn-secondary"
+              onClick={() => handleBulkTagAction('remove')}
+              disabled={selectedPhotoIds.length === 0 || bulkPeopleToUpdate.length === 0}
+              style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+            >
+              Odobrať vybraných ľudí
+            </button>
+            <button 
+              className="btn btn-primary"
+              onClick={() => handleBulkTagAction('add')}
+              disabled={selectedPhotoIds.length === 0 || bulkPeopleToUpdate.length === 0}
+              style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+            >
+              Priradiť vybraných ľudí
+            </button>
+          </div>
         </div>
       )}
 
