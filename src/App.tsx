@@ -211,6 +211,10 @@ function App() {
         <div className="sidebar-footer">
           {userSession ? (
             <div style={{ marginBottom: '1rem', padding: '0.65rem 0.85rem', backgroundColor: 'rgba(167, 139, 250, 0.1)', border: '1px solid rgba(167, 139, 250, 0.25)', borderRadius: '8px', textAlign: 'left' }}>
+              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#22c55e', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.35rem' }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#22c55e', display: 'inline-block', boxShadow: '0 0 6px #22c55e' }}></span>
+                ONLINE REŽIM
+              </div>
               <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'white', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <User size={14} style={{ color: '#a78bfa' }} /> {userSession.name || userSession.email.split('@')[0]}
               </div>
