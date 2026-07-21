@@ -181,9 +181,9 @@ export const Presentations: React.FC<PresentationsProps> = ({ onStartSlideshow, 
                   className="btn btn-secondary"
                   disabled={albumPhotos.length === 0}
                   onClick={() => setIsPhotobookPreviewOpen(true)}
-                  style={{ gap: '0.5rem' }}
+                  style={{ gap: '0.5rem', fontWeight: 600, borderColor: 'var(--accent)' }}
                 >
-                  <Printer size={16} /> Zostaviť fotoknihu
+                  <Printer size={16} /> 🖨️ Export do PDF / Tlač fotoknihy
                 </button>
                 
                 <button className="btn btn-danger" style={{ marginLeft: 'auto' }} onClick={() => handleDeleteAlbum(selectedAlbum.id)}>
