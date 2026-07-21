@@ -79,6 +79,37 @@ export const validateYearOrDate = (dateStr: string): { isValid: boolean; error?:
   return { isValid: true };
 };
 
+export const extractDecadeFromDate = (dateStr: string, fallbackDecade = 1980): number => {
+  if (!dateStr) return fallbackDecade;
+  const trimmed = dateStr.trim().replace(/\s+/g, '');
+
+  const fullDatePattern = /(\d{1,2})\.(\d{1,2})\.(\d{4})/;
+  const monthYearPattern = /(\d{1,2})\.(\d{4})/;
+  const yearPattern = /(\d{4})/;
+  const isoPattern = /(\d{4})-(\d{2})/;
+
+  let year = 0;
+  if (fullDatePattern.test(trimmed)) {
+    const m = trimmed.match(fullDatePattern)!;
+    year = parseInt(m[3]);
+  } else if (monthYearPattern.test(trimmed)) {
+    const m = trimmed.match(monthYearPattern)!;
+    year = parseInt(m[2]);
+  } else if (isoPattern.test(trimmed)) {
+    const m = trimmed.match(isoPattern)!;
+    year = parseInt(m[1]);
+  } else if (yearPattern.test(trimmed)) {
+    const m = trimmed.match(yearPattern)!;
+    year = parseInt(m[1]);
+  }
+
+  if (year >= 1900 && year <= new Date().getFullYear()) {
+    return Math.floor(year / 10) * 10;
+  }
+
+  return fallbackDecade;
+};
+
 export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, onClosePhotoDetail }) => {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
@@ -357,11 +388,13 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
         return;
       }
 
+      const calculatedDecade = extractDecadeFromDate(formData.taken_at, Number(formData.decade));
+
       const photoToSave = {
         title: formData.title || 'Bez názvu',
         description: formData.description,
         taken_at: formData.taken_at,
-        decade: Number(formData.decade),
+        decade: calculatedDecade,
         location: formData.location,
         storage_path: finalStoragePath,
         is_external: formData.is_external,
@@ -393,11 +426,13 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
     }
 
     try {
+      const calculatedDecade = extractDecadeFromDate(formData.taken_at, Number(formData.decade));
+
       const updates = {
         title: formData.title,
         description: formData.description,
         taken_at: formData.taken_at,
-        decade: Number(formData.decade),
+        decade: calculatedDecade,
         location: formData.location,
         people: formData.people,
         ai_metadata: {
@@ -852,7 +887,14 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
                     style={{ paddingLeft: '1rem' }}
                     placeholder="napr. 15.06.1974, 06.1974 alebo 1974"
                     value={formData.taken_at}
-                    onChange={(e) => setFormData(prev => ({ ...prev, taken_at: e.target.value }))}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFormData(prev => ({ 
+                        ...prev, 
+                        taken_at: val,
+                        decade: extractDecadeFromDate(val, prev.decade)
+                      }));
+                    }}
                   />
                 </div>
 
@@ -1134,7 +1176,14 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
                       style={{ paddingLeft: '1rem' }}
                       placeholder="napr. 15.06.1974, 06.1974 alebo 1974"
                       value={formData.taken_at}
-                      onChange={(e) => setFormData(prev => ({ ...prev, taken_at: e.target.value }))}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setFormData(prev => ({ 
+                          ...prev, 
+                          taken_at: val,
+                          decade: extractDecadeFromDate(val, prev.decade)
+                        }));
+                      }}
                     />
                   </div>
 
