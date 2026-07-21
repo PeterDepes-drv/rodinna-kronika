@@ -100,6 +100,7 @@ export const Presentations: React.FC<PresentationsProps> = ({ onStartSlideshow, 
       loadAlbumsData();
     } catch (e) {
       console.error(e);
+      alert('Chyba pri úprave fotky v albume: ' + ((e as Error).message || 'Neznáma chyba.'));
     }
   };
 

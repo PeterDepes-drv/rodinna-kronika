@@ -559,14 +559,18 @@ class DatabaseService {
 
   async getAlbumPhotos(albumId: string): Promise<Photo[]> {
     if (this.isUsingSupabase) {
-      const { data, error } = await this.supabase
-        .from('album_photos')
-        .select('photo_id, photos(*)')
-        .eq('album_id', albumId)
-        .order('sort_order');
-      
-      if (error) throw error;
-      return data.map((d: any) => d.photos) as Photo[];
+      try {
+        const { data, error } = await this.supabase
+          .from('album_photos')
+          .select('photo_id, photos(*)')
+          .eq('album_id', albumId);
+        
+        if (error) throw error;
+        return (data || []).map((d: any) => d.photos).filter(Boolean) as Photo[];
+      } catch (e) {
+        console.error('Chyba pri načítaní fotiek albumu:', e);
+        return [];
+      }
     } else {
       const albumPhotos = localStorage.getItem('kronika_album_photos');
       if (!albumPhotos) return [];
@@ -612,29 +616,26 @@ class DatabaseService {
 
   async addPhotoToAlbum(albumId: string, photoId: string): Promise<void> {
     if (this.isUsingSupabase) {
-      // Zistíme posledné sort_order
-      const { data } = await this.supabase
-        .from('album_photos')
-        .select('sort_order')
-        .eq('album_id', albumId)
-        .order('sort_order', { ascending: false })
-        .limit(1);
-
-      const nextOrder = data && data.length > 0 ? data[0].sort_order + 1 : 0;
-
-      await this.supabase.from('album_photos').insert([{
+      const { error } = await this.supabase.from('album_photos').insert([{
         album_id: albumId,
-        photo_id: photoId,
-        sort_order: nextOrder
+        photo_id: photoId
       }]);
+      
+      if (error && !error.message?.includes('duplicate')) {
+        console.error('Chyba pridania fotky do albumu v Supabase:', error);
+      }
 
       // Nastaviť prvú fotku ako titulku albumu (ak nie je nastavená)
-      const { data: album } = await this.supabase.from('albums').select('cover_photo_path').eq('id', albumId).single();
-      if (album && !album.cover_photo_path) {
-        const { data: photo } = await this.supabase.from('photos').select('storage_path').eq('id', photoId).single();
-        if (photo) {
-          await this.supabase.from('albums').update({ cover_photo_path: photo.storage_path }).eq('id', albumId);
+      try {
+        const { data: album } = await this.supabase.from('albums').select('cover_photo_path').eq('id', albumId).single();
+        if (album && !album.cover_photo_path) {
+          const { data: photo } = await this.supabase.from('photos').select('storage_path').eq('id', photoId).single();
+          if (photo) {
+            await this.supabase.from('albums').update({ cover_photo_path: photo.storage_path }).eq('id', albumId);
+          }
         }
+      } catch (e) {
+        console.warn('Titulný obrázok sa nepodarilo nastaviť:', e);
       }
     } else {
       const albumPhotos = JSON.parse(localStorage.getItem('kronika_album_photos') || '{}');
