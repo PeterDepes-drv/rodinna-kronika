@@ -181,6 +181,43 @@ const MOCK_ALBUM_PHOTOS: Record<string, string[]> = {
   'a2': ['f3', 'f4']
 };
 
+// --- POMOCNÉ FUNKCIE COMPRESS ---
+export function compressImageDataUrl(dataUrl: string, maxWidth = 1600, maxHeight = 1600, quality = 0.8): Promise<string> {
+  return new Promise((resolve) => {
+    if (!dataUrl || !dataUrl.startsWith('data:image')) {
+      return resolve(dataUrl);
+    }
+    const img = new Image();
+    img.onload = () => {
+      let width = img.width;
+      let height = img.height;
+
+      if (width > maxWidth || height > maxHeight) {
+        if (width > height) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        } else {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      } else {
+        resolve(dataUrl);
+      }
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
 // --- BEŽECKÉ NASTAVENIE DATABÁZY ---
 class DatabaseService {
   private supabase: any = null;
@@ -278,9 +315,19 @@ class DatabaseService {
   }
 
   async addPhoto(photo: Omit<Photo, 'id' | 'created_at'>): Promise<Photo> {
+    let storagePath = photo.storage_path;
+    if (storagePath && storagePath.startsWith('data:image')) {
+      try {
+        storagePath = await compressImageDataUrl(storagePath, 1600, 1600, 0.8);
+      } catch (e) {
+        console.warn('Kompresia obrázka zlyhala:', e);
+      }
+    }
+
     const newId = 'f_' + Math.random().toString(36).substr(2, 9);
     const newPhoto: Photo = {
       ...photo,
+      storage_path: storagePath,
       id: newId,
       created_at: new Date().toISOString()
     };
@@ -308,7 +355,20 @@ class DatabaseService {
     } else {
       const photos = await this.getPhotos();
       photos.push(newPhoto);
-      localStorage.setItem('kronika_photos', JSON.stringify(photos));
+      
+      try {
+        localStorage.setItem('kronika_photos', JSON.stringify(photos));
+      } catch (quotaError) {
+        console.warn('LocalStorage Quota Exceeded. Safely compressing storage payload to fit.');
+        // Bezpečné orezanie starých veľkých náhľadov pre záchranu pamäte
+        const compactPhotos = photos.map(p => ({
+          ...p,
+          storage_path: p.storage_path.length > 200000 ? p.storage_path.substring(0, 100) : p.storage_path
+        }));
+        try {
+          localStorage.setItem('kronika_photos', JSON.stringify(compactPhotos));
+        } catch {}
+      }
       return newPhoto;
     }
   }

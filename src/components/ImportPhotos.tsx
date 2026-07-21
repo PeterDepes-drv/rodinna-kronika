@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { googlePhotos } from '../services/googlePhotos';
 import type { GooglePhotoItem } from '../services/googlePhotos';
-import { db } from '../services/db';
+import { db, compressImageDataUrl } from '../services/db';
 import { analyzePhoto, fileToBase64 } from '../services/gemini';
 import { 
   LogIn, 
@@ -158,9 +158,13 @@ export const ImportPhotos: React.FC<ImportPhotosProps> = ({ onNavigate }) => {
         setImportProgress(Math.round((count / toImport.length) * 100));
         setStatusMessage(`Spracovávam fotku ${count} z ${toImport.length}: ${item.name}...`);
 
-        // Prevod do Base64 pre uloženie aj AI analýzu
-        const base64 = await fileToBase64(item.file);
-        const dataUrl = `data:${item.file.type || 'image/jpeg'};base64,${base64}`;
+        // Prevod do Base64 a optimalizácia rozlíšenia pre mobil
+        const rawBase64 = await fileToBase64(item.file);
+        let dataUrl = `data:${item.file.type || 'image/jpeg'};base64,${rawBase64}`;
+        try {
+          dataUrl = await compressImageDataUrl(dataUrl, 1400, 1400, 0.75);
+        } catch (e) {}
+        const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : rawBase64;
 
         let aiMetadata = undefined;
         let guessedDecade = 1980;
