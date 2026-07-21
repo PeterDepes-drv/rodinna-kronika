@@ -8,6 +8,7 @@ interface GalleryProps {
   onSelectPhoto: (photo: Photo) => void;
   selectedPhoto: Photo | null;
   onClosePhotoDetail: () => void;
+  userSession: any;
 }
 
 export const validateYearOrDate = (dateStr: string): { isValid: boolean; error?: string } => {
@@ -110,7 +111,7 @@ export const extractDecadeFromDate = (dateStr: string, fallbackDecade = 1980): n
   return fallbackDecade;
 };
 
-export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, onClosePhotoDetail }) => {
+export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, onClosePhotoDetail, userSession }) => {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
@@ -544,23 +545,25 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
           <h1>Rodinný archív</h1>
           <p>Prehliadajte, filtrujte a popisujte rodinné spomienky.</p>
         </div>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <button 
-            className={`btn ${isBulkMode ? 'btn-primary' : 'btn-secondary'}`} 
-            onClick={() => {
-              setIsBulkMode(!isBulkMode);
-              setSelectedPhotoIds([]);
-              setBulkPeopleToUpdate([]);
-            }}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600 }}
-          >
-            <Users size={16} /> 
-            {isBulkMode ? 'Zrušiť hromadný režim' : 'Hromadné označovanie ľudí'}
-          </button>
-          <button className="btn btn-primary" onClick={handleOpenAddModal}>
-            <Plus size={18} /> Pridať spomienku
-          </button>
-        </div>
+        {userSession && (
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <button 
+              className={`btn ${isBulkMode ? 'btn-primary' : 'btn-secondary'}`} 
+              onClick={() => {
+                setIsBulkMode(!isBulkMode);
+                setSelectedPhotoIds([]);
+                setBulkPeopleToUpdate([]);
+              }}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600 }}
+            >
+              <Users size={16} /> 
+              {isBulkMode ? 'Zrušiť hromadný režim' : 'Hromadné označovanie ľudí'}
+            </button>
+            <button className="btn btn-primary" onClick={handleOpenAddModal}>
+              <Plus size={18} /> Pridať spomienku
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Riadok s filtrami */}
@@ -1060,30 +1063,32 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                     <div className="meta-item-label">Príbeh / Popis spomienky</div>
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      style={{
-                        fontSize: '0.75rem',
-                        padding: '0.25rem 0.5rem',
-                        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.15) 100%)',
-                        borderColor: 'rgba(139, 92, 246, 0.3)',
-                        color: '#c084fc',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.25rem'
-                      }}
-                      disabled={aiAnalyzing}
-                      onClick={async () => {
-                        handleEnterEditMode();
-                        setTimeout(() => {
-                          handleAIGenerateForExisting();
-                        }, 150);
-                      }}
-                      title="Spustiť Gemini AI na rozpoznanie textov, dátumu, lokality a príbehu tejto fotografie"
-                    >
-                      <Brain size={12} /> {aiAnalyzing ? 'Analyzujem...' : 'Doplniť cez Gemini AI'}
-                    </button>
+                    {userSession && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{
+                          fontSize: '0.75rem',
+                          padding: '0.25rem 0.5rem',
+                          background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.15) 100%)',
+                          borderColor: 'rgba(139, 92, 246, 0.3)',
+                          color: '#c084fc',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.25rem'
+                        }}
+                        disabled={aiAnalyzing}
+                        onClick={async () => {
+                          handleEnterEditMode();
+                          setTimeout(() => {
+                            handleAIGenerateForExisting();
+                          }, 150);
+                        }}
+                        title="Spustiť Gemini AI na rozpoznanie textov, dátumu, lokality a príbehu tejto fotografie"
+                      >
+                        <Brain size={12} /> {aiAnalyzing ? 'Analyzujem...' : 'Doplniť cez Gemini AI'}
+                      </button>
+                    )}
                   </div>
                   <p style={{ color: 'var(--text-primary)', whiteSpace: 'pre-line', fontSize: '0.95rem' }}>
                     {selectedPhoto.description || 'Táto fotografia zatiaľ nemá priradený príbeh. Kliknutím na tlačidlo vyššie môžete spustiť Gemini AI analýzu.'}
@@ -1136,14 +1141,16 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
                   </div>
                 )}
 
-                <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
-                  <button className="btn btn-danger" onClick={() => handleDeletePhoto(selectedPhoto.id)}>
-                    <Trash2 size={16} /> Vymazať
-                  </button>
-                  <button className="btn btn-secondary" style={{ marginLeft: 'auto' }} onClick={handleEnterEditMode}>
-                    <Edit size={16} /> Editovať spomienku
-                  </button>
-                </div>
+                {userSession && (
+                  <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
+                    <button className="btn btn-danger" onClick={() => handleDeletePhoto(selectedPhoto.id)}>
+                      <Trash2 size={16} /> Vymazať
+                    </button>
+                    <button className="btn btn-secondary" style={{ marginLeft: 'auto' }} onClick={handleEnterEditMode}>
+                      <Edit size={16} /> Editovať spomienku
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               /* Formulár na editáciu fotky */

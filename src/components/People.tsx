@@ -5,9 +5,10 @@ import { Plus, Users, Calendar, Award, Trash2, Edit, X, FileText, AlertCircle, A
 
 interface PeopleProps {
   onSelectPhoto: (photo: Photo) => void;
+  userSession: any;
 }
 
-export const People: React.FC<PeopleProps> = ({ onSelectPhoto }) => {
+export const People: React.FC<PeopleProps> = ({ onSelectPhoto, userSession }) => {
   const [people, setPeople] = useState<Person[]>([]);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
@@ -181,14 +182,16 @@ export const People: React.FC<PeopleProps> = ({ onSelectPhoto }) => {
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '0.75rem' }}>
-                      <button className="btn btn-danger" onClick={() => handleDeletePerson(selectedPerson.id)}>
-                        <Trash2 size={16} /> Vymazať
-                      </button>
-                      <button className="btn btn-secondary" onClick={handleOpenEdit}>
-                        <Edit size={16} /> Editovať profil
-                      </button>
-                    </div>
+                    {userSession && (
+                      <div style={{ display: 'flex', gap: '0.75rem' }}>
+                        <button className="btn btn-danger" onClick={() => handleDeletePerson(selectedPerson.id)}>
+                          <Trash2 size={16} /> Vymazať
+                        </button>
+                        <button className="btn btn-secondary" onClick={handleOpenEdit}>
+                          <Edit size={16} /> Editovať profil
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {selectedPerson.birth_date && (
@@ -330,9 +333,11 @@ export const People: React.FC<PeopleProps> = ({ onSelectPhoto }) => {
               <h1>Rodokmeň a ľudia</h1>
               <p>Zoznam členov našej rodiny a ich osobné profily so spomienkami.</p>
             </div>
-            <button className="btn btn-primary" onClick={handleOpenAddModal}>
-              <Plus size={18} /> Pridať člena rodiny
-            </button>
+            {userSession && (
+              <button className="btn btn-primary" onClick={handleOpenAddModal}>
+                <Plus size={18} /> Pridať člena rodiny
+              </button>
+            )}
           </div>
 
           {loading ? (

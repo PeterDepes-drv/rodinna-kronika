@@ -6,9 +6,10 @@ import { Plus, BookOpen, Play, Printer, X, PlusCircle, CheckCircle, Trash2, Arro
 interface PresentationsProps {
   onStartSlideshow: (photos: Photo[], title: string) => void;
   onSelectPhoto: (photo: Photo) => void;
+  userSession: any;
 }
 
-export const Presentations: React.FC<PresentationsProps> = ({ onStartSlideshow, onSelectPhoto }) => {
+export const Presentations: React.FC<PresentationsProps> = ({ onStartSlideshow, onSelectPhoto, userSession }) => {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
@@ -186,9 +187,11 @@ export const Presentations: React.FC<PresentationsProps> = ({ onStartSlideshow, 
                   <Printer size={16} /> 🖨️ Export do PDF / Tlač fotoknihy
                 </button>
                 
-                <button className="btn btn-danger" style={{ marginLeft: 'auto' }} onClick={() => handleDeleteAlbum(selectedAlbum.id)}>
-                  <Trash2 size={16} /> Vymazať album
-                </button>
+                {userSession && (
+                  <button className="btn btn-danger" style={{ marginLeft: 'auto' }} onClick={() => handleDeleteAlbum(selectedAlbum.id)}>
+                    <Trash2 size={16} /> Vymazať album
+                  </button>
+                )}
               </div>
 
               <div className="panel" style={{ marginBottom: '2rem' }}>
@@ -198,13 +201,15 @@ export const Presentations: React.FC<PresentationsProps> = ({ onStartSlideshow, 
                   <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
                     Počet fotografií: <strong>{albumPhotos.length}</strong>
                   </span>
-                  <button 
-                    className="btn btn-secondary" 
-                    onClick={() => setIsManagePhotosOpen(true)}
-                    style={{ fontSize: '0.85rem', padding: '0.4rem 0.85rem' }}
-                  >
-                    Pridať / Odobrať fotky
-                  </button>
+                  {userSession && (
+                    <button 
+                      className="btn btn-secondary" 
+                      onClick={() => setIsManagePhotosOpen(true)}
+                      style={{ fontSize: '0.85rem', padding: '0.4rem 0.85rem' }}
+                    >
+                      Pridať / Odobrať fotky
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -303,9 +308,11 @@ export const Presentations: React.FC<PresentationsProps> = ({ onStartSlideshow, 
               <h1>Prezentácie a fotoknihy</h1>
               <p>Zoskupujte spomienky do tematických kníh a spúšťajte plynulé prezentácie.</p>
             </div>
-            <button className="btn btn-primary" onClick={() => setIsAddAlbumOpen(true)}>
-              <Plus size={18} /> Vytvoriť nový album
-            </button>
+            {userSession && (
+              <button className="btn btn-primary" onClick={() => setIsAddAlbumOpen(true)}>
+                <Plus size={18} /> Vytvoriť nový album
+              </button>
+            )}
           </div>
 
           {albums.length === 0 ? (

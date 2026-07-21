@@ -141,17 +141,19 @@ function App() {
             onSelectPhoto={setSelectedPhoto}
             selectedPhoto={selectedPhoto}
             onClosePhotoDetail={handleClosePhotoDetail}
+            userSession={userSession}
           />
         );
       case 'timeline':
         return <Timeline onSelectPhoto={handleSelectPhoto} />;
       case 'people':
-        return <People onSelectPhoto={handleSelectPhoto} />;
+        return <People onSelectPhoto={handleSelectPhoto} userSession={userSession} />;
       case 'presentations':
         return (
           <Presentations 
             onStartSlideshow={handleStartSlideshow} 
             onSelectPhoto={handleSelectPhoto}
+            userSession={userSession}
           />
         );
       case 'import':
@@ -215,19 +217,23 @@ function App() {
               </button>
             </li>
 
-            <li className={`menu-item ${activeView === 'import' ? 'active' : ''}`}>
-              <button onClick={() => setActiveView('import')}>
-                <CloudDownload size={18} />
-                <span>Import fotiek</span>
-              </button>
-            </li>
+            {userSession && (
+              <li className={`menu-item ${activeView === 'import' ? 'active' : ''}`}>
+                <button onClick={() => setActiveView('import')}>
+                  <CloudDownload size={18} />
+                  <span>Import fotiek</span>
+                </button>
+              </li>
+            )}
 
-            <li className={`menu-item ${activeView === 'settings' ? 'active' : ''}`}>
-              <button onClick={() => setActiveView('settings')}>
-                <SettingsIcon size={18} />
-                <span>Nastavenia</span>
-              </button>
-            </li>
+            {userSession && (
+              <li className={`menu-item ${activeView === 'settings' ? 'active' : ''}`}>
+                <button onClick={() => setActiveView('settings')}>
+                  <SettingsIcon size={18} />
+                  <span>Nastavenia</span>
+                </button>
+              </li>
+            )}
           </ul>
         </nav>
 
@@ -236,7 +242,7 @@ function App() {
             <div style={{ marginBottom: '1rem', padding: '0.65rem 0.85rem', backgroundColor: 'rgba(167, 139, 250, 0.1)', border: '1px solid rgba(167, 139, 250, 0.25)', borderRadius: '8px', textAlign: 'left' }}>
               <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#22c55e', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.35rem' }}>
                 <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#22c55e', display: 'inline-block', boxShadow: '0 0 6px #22c55e' }}></span>
-                ONLINE REŽIM
+                ✏️ REŽIM SPRÁVCU (ONLINE)
               </div>
               <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'white', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <User size={14} style={{ color: '#a78bfa' }} /> {userSession.name || userSession.email.split('@')[0]}
@@ -248,17 +254,23 @@ function App() {
                 onClick={() => authService.logout()} 
                 style={{ marginTop: '0.5rem', background: 'none', border: 'none', color: 'var(--danger)', fontSize: '0.75rem', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
               >
-                <LogOut size={12} /> Odhlásiť sa
+                <LogOut size={12} /> Odhlásiť správcu
               </button>
             </div>
           ) : (
-            <button 
-              onClick={() => setIsAuthModalOpen(true)}
-              className="btn btn-secondary"
-              style={{ width: '100%', marginBottom: '1rem', fontSize: '0.8rem', padding: '0.55rem 0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
-            >
-              <LogIn size={14} /> Prihlásiť sa cez e-mail
-            </button>
+            <div style={{ marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.6rem' }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--text-secondary)', display: 'inline-block' }}></span>
+                👁️ REŽIM PREZERANIA (ČÍTANIE)
+              </div>
+              <button 
+                onClick={() => setIsAuthModalOpen(true)}
+                className="btn btn-secondary"
+                style={{ width: '100%', fontSize: '0.8rem', padding: '0.55rem 0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+              >
+                <LogIn size={14} /> Prihlásiť správcu (E-mail)
+              </button>
+            </div>
           )}
 
           <p>Vyrobené s <Heart size={10} style={{ color: 'red', display: 'inline' }} /> pre našu rodinu</p>
