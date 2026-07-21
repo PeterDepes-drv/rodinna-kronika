@@ -105,7 +105,7 @@ class GooglePhotosService {
     const scope = 'https://www.googleapis.com/auth/photoslibrary.readonly';
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(
       this.clientId
-    )}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(scope)}`;
+    )}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(scope)}&prompt=consent`;
 
     // Presmerovanie na Google prihlasovaciu stránku
     window.location.href = authUrl;
