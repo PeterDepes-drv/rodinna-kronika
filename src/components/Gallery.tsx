@@ -11,12 +11,15 @@ interface GalleryProps {
 }
 
 export const validateYearOrDate = (dateStr: string): { isValid: boolean; error?: string } => {
-  const trimmed = dateStr ? dateStr.trim() : '';
+  const trimmed = dateStr ? dateStr.trim().replace(/\s+/g, '') : '';
   if (!trimmed) return { isValid: true };
 
   const yearPattern = /^(\d{4})$/;
-  const yearMonthPattern = /^(\d{4})-(\d{2})$/;
-  const fullDatePattern = /^(\d{4})-(\d{2})-(\d{2})$/;
+  const monthYearPattern = /^(\d{1,2})\.(\d{4})$/;
+  const fullDatePattern = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/;
+
+  const legacyFullDatePattern = /^(\d{4})-(\d{2})-(\d{2})$/;
+  const legacyMonthYearPattern = /^(\d{4})-(\d{2})$/;
 
   let year = 0;
   let month = 1;
@@ -27,23 +30,34 @@ export const validateYearOrDate = (dateStr: string): { isValid: boolean; error?:
   if (yearPattern.test(trimmed)) {
     year = parseInt(trimmed);
     matches = true;
-  } else if (yearMonthPattern.test(trimmed)) {
-    const m = trimmed.match(yearMonthPattern)!;
-    year = parseInt(m[1]);
-    month = parseInt(m[2]);
+  } else if (monthYearPattern.test(trimmed)) {
+    const m = trimmed.match(monthYearPattern)!;
+    month = parseInt(m[1]);
+    year = parseInt(m[2]);
     matches = true;
   } else if (fullDatePattern.test(trimmed)) {
     const m = trimmed.match(fullDatePattern)!;
+    day = parseInt(m[1]);
+    month = parseInt(m[2]);
+    year = parseInt(m[3]);
+    matches = true;
+  } else if (legacyFullDatePattern.test(trimmed)) {
+    const m = trimmed.match(legacyFullDatePattern)!;
     year = parseInt(m[1]);
     month = parseInt(m[2]);
     day = parseInt(m[3]);
+    matches = true;
+  } else if (legacyMonthYearPattern.test(trimmed)) {
+    const m = trimmed.match(legacyMonthYearPattern)!;
+    year = parseInt(m[1]);
+    month = parseInt(m[2]);
     matches = true;
   }
 
   if (!matches) {
     return { 
       isValid: false, 
-      error: 'Formát dátumu musí byť: RRRR (napr. 1974), RRRR-MM (napr. 1974-06) alebo RRRR-MM-DD (napr. 1974-06-15).' 
+      error: 'Formát dátumu musí byť: DD.MM.RRRR (napr. 15.06.1974), MM.RRRR (napr. 06.1974) alebo len RRRR (napr. 1974).' 
     };
   }
 
@@ -366,14 +380,54 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return 'Neznámy dátum';
+    const trimmed = dateStr.trim().replace(/\s+/g, '');
+    
+    const slovakMonths = [
+      'január', 'február', 'marec', 'apríl', 'máj', 'jún',
+      'júl', 'august', 'september', 'október', 'november', 'december'
+    ];
+
+    const genitiveMonths = [
+      'januára', 'februára', 'marca', 'apríla', 'mája', 'júna',
+      'júla', 'augusta', 'septembra', 'októbra', 'novembra', 'decembra'
+    ];
+
     try {
-      const parts = dateStr.split('-');
+      // 1. Kontrola formátu DD.MM.RRRR
+      const fullDatePattern = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/;
+      if (fullDatePattern.test(trimmed)) {
+        const m = trimmed.match(fullDatePattern)!;
+        const day = parseInt(m[1]);
+        const monthIdx = parseInt(m[2]) - 1;
+        const year = m[3];
+        const monthName = genitiveMonths[monthIdx] || slovakMonths[monthIdx] || 'n/a';
+        return `${day}. ${monthName} ${year}`;
+      }
+
+      // 2. Kontrola formátu MM.RRRR
+      const monthYearPattern = /^(\d{1,2})\.(\d{4})$/;
+      if (monthYearPattern.test(trimmed)) {
+        const m = trimmed.match(monthYearPattern)!;
+        const monthIdx = parseInt(m[1]) - 1;
+        const year = m[2];
+        return `${slovakMonths[monthIdx] || 'n/a'} ${year}`;
+      }
+
+      // 3. Kontrola formátu RRRR
+      const yearPattern = /^(\d{4})$/;
+      if (yearPattern.test(trimmed)) {
+        return trimmed;
+      }
+
+      // 4. Starý formát fallback (ISO: YYYY-MM-DD / YYYY-MM)
+      const parts = trimmed.split('-');
       if (parts.length === 3) {
-        return new Date(dateStr).toLocaleDateString('sk-SK', { day: 'numeric', month: 'long', year: 'numeric' });
+        return new Date(trimmed).toLocaleDateString('sk-SK', { day: 'numeric', month: 'long', year: 'numeric' });
       } else if (parts.length === 2) {
         const [year, month] = parts;
         return new Date(parseInt(year), parseInt(month) - 1).toLocaleDateString('sk-SK', { month: 'long', year: 'numeric' });
       }
+
       return dateStr;
     } catch {
       return dateStr;
@@ -577,7 +631,7 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
                     type="text" 
                     className="input-field"
                     style={{ paddingLeft: '1rem' }}
-                    placeholder="napr. 1974 alebo 1974-06-15"
+                    placeholder="napr. 15.06.1974, 06.1974 alebo 1974"
                     value={formData.taken_at}
                     onChange={(e) => setFormData(prev => ({ ...prev, taken_at: e.target.value }))}
                   />
@@ -833,6 +887,7 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
                       type="text" 
                       className="input-field"
                       style={{ paddingLeft: '1rem' }}
+                      placeholder="napr. 15.06.1974, 06.1974 alebo 1974"
                       value={formData.taken_at}
                       onChange={(e) => setFormData(prev => ({ ...prev, taken_at: e.target.value }))}
                     />
