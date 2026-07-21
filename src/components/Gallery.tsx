@@ -10,6 +10,61 @@ interface GalleryProps {
   onClosePhotoDetail: () => void;
 }
 
+export const validateYearOrDate = (dateStr: string): { isValid: boolean; error?: string } => {
+  const trimmed = dateStr ? dateStr.trim() : '';
+  if (!trimmed) return { isValid: true };
+
+  const yearPattern = /^(\d{4})$/;
+  const yearMonthPattern = /^(\d{4})-(\d{2})$/;
+  const fullDatePattern = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+  let year = 0;
+  let month = 1;
+  let day = 1;
+  let matches = false;
+  const currentYear = new Date().getFullYear();
+
+  if (yearPattern.test(trimmed)) {
+    year = parseInt(trimmed);
+    matches = true;
+  } else if (yearMonthPattern.test(trimmed)) {
+    const m = trimmed.match(yearMonthPattern)!;
+    year = parseInt(m[1]);
+    month = parseInt(m[2]);
+    matches = true;
+  } else if (fullDatePattern.test(trimmed)) {
+    const m = trimmed.match(fullDatePattern)!;
+    year = parseInt(m[1]);
+    month = parseInt(m[2]);
+    day = parseInt(m[3]);
+    matches = true;
+  }
+
+  if (!matches) {
+    return { 
+      isValid: false, 
+      error: 'Formát dátumu musí byť: RRRR (napr. 1974), RRRR-MM (napr. 1974-06) alebo RRRR-MM-DD (napr. 1974-06-15).' 
+    };
+  }
+
+  if (year < 1900 || year > currentYear) {
+    return { 
+      isValid: false, 
+      error: `Rok musí byť medzi 1900 a ${currentYear}. Zadaný rok: ${year}.` 
+    };
+  }
+
+  if (month < 1 || month > 12) {
+    return { isValid: false, error: 'Mesiac musí byť medzi 01 a 12.' };
+  }
+
+  if (day < 1 || day > 31) {
+    return { isValid: false, error: 'Deň musí byť medzi 01 a 31.' };
+  }
+
+  return { isValid: true };
+};
+
 export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, onClosePhotoDetail }) => {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
@@ -200,6 +255,13 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    const dateVal = validateYearOrDate(formData.taken_at);
+    if (!dateVal.isValid) {
+      alert(dateVal.error);
+      return;
+    }
+
     try {
       let finalStoragePath = formData.storage_path;
 
@@ -241,6 +303,12 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPhoto) return;
+
+    const dateVal = validateYearOrDate(formData.taken_at);
+    if (!dateVal.isValid) {
+      alert(dateVal.error);
+      return;
+    }
 
     try {
       const updates = {
