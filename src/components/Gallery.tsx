@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../services/db';
 import type { Photo, Person, AIAnalysisResult } from '../services/db';
 import { analyzePhoto, fileToBase64 } from '../services/gemini';
-import { Search, Plus, Calendar, MapPin, Users, Trash2, Edit, X, Brain, AlertCircle } from 'lucide-react';
+import { Search, Plus, Calendar, MapPin, Users, Trash2, Edit, X, Brain, AlertCircle, Maximize2 } from 'lucide-react';
 
 interface GalleryProps {
   onSelectPhoto: (photo: Photo) => void;
@@ -611,9 +611,37 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
         <div className="modal-overlay">
           <div className="modal-content">
             {/* Ľavá strana: Fotka */}
-            <div className="modal-photo-section">
-              <img src={selectedPhoto.storage_path} alt={selectedPhoto.title} className="modal-photo-img" />
+            <div className="modal-photo-section" style={{ position: 'relative' }}>
+              <img id="detail-modal-photo-img" src={selectedPhoto.storage_path} alt={selectedPhoto.title} className="modal-photo-img" />
               <span className="photo-badge" style={{ top: '1rem', right: '1rem', fontSize: '0.85rem' }}>{selectedPhoto.decade}s</span>
+              
+              <button
+                type="button"
+                onClick={() => {
+                  const imgEl = document.getElementById('detail-modal-photo-img');
+                  if (imgEl && imgEl.requestFullscreen) {
+                    imgEl.requestFullscreen().catch(() => {});
+                  } else if (document.documentElement.requestFullscreen) {
+                    document.documentElement.requestFullscreen().catch(() => {});
+                  }
+                }}
+                className="btn btn-secondary"
+                style={{
+                  position: 'absolute',
+                  bottom: '1rem',
+                  left: '1rem',
+                  backgroundColor: 'rgba(0,0,0,0.7)',
+                  borderColor: 'rgba(255,255,255,0.2)',
+                  fontSize: '0.8rem',
+                  padding: '0.4rem 0.8rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  borderRadius: '8px'
+                }}
+              >
+                <Maximize2 size={15} /> Celá obrazovka
+              </button>
             </div>
 
             {/* Pravá strana: Detail alebo Editácia */}

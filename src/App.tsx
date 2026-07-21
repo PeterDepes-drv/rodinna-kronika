@@ -15,7 +15,9 @@ import {
   X,
   User,
   LogIn,
-  LogOut
+  LogOut,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { Gallery } from './components/Gallery';
@@ -80,11 +82,32 @@ function App() {
     setSlideshowTitle(title);
     setCurrentSlideIndex(0);
     setIsSlideshowPlaying(true);
+
+    // Prechod na celú obrazovku
+    if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
   };
 
   const handleCloseSlideshow = () => {
     setSlideshowPhotos([]);
     setIsSlideshowPlaying(false);
+    if (document.fullscreenElement && document.exitFullscreen) {
+      document.exitFullscreen().catch(() => {});
+    }
+  };
+
+  const toggleFullscreen = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!document.fullscreenElement) {
+      if (document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
   };
 
   const handlePrevSlide = (e: React.MouseEvent) => {
@@ -267,13 +290,23 @@ function App() {
                   e.stopPropagation();
                   setIsSlideshowPlaying(!isSlideshowPlaying);
                 }}
+                title={isSlideshowPlaying ? 'Pozastaviť' : 'Spustiť'}
               >
                 {isSlideshowPlaying ? <Pause size={18} /> : <Play size={18} />}
               </button>
               <button 
                 className="btn-icon"
                 style={{ backgroundColor: 'rgba(255,255,255,0.05)', color: 'white', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                onClick={toggleFullscreen}
+                title="Prepnúť celú obrazovku (Fullscreen)"
+              >
+                {document.fullscreenElement ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+              </button>
+              <button 
+                className="btn-icon"
+                style={{ backgroundColor: 'rgba(255,255,255,0.05)', color: 'white', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
                 onClick={handleCloseSlideshow}
+                title="Zatvoriť"
               >
                 <X size={18} />
               </button>
