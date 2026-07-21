@@ -390,11 +390,10 @@ export const ImportPhotos: React.FC<ImportPhotosProps> = ({ onNavigate }) => {
               border: '2px dashed var(--accent)', 
               backgroundColor: 'rgba(167, 139, 250, 0.05)', 
               padding: '3rem 2rem',
-              cursor: 'pointer',
               marginBottom: '2rem',
-              borderRadius: '16px'
+              borderRadius: '16px',
+              position: 'relative'
             }}
-            onClick={() => document.getElementById('local-file-input')?.click()}
           >
             <Upload size={56} style={{ color: 'var(--accent)', marginBottom: '1rem', filter: 'drop-shadow(0 0 8px var(--accent-glow))' }} />
             <h3 style={{ fontSize: '1.25rem' }}>Potiahnite rodinné fotky sem alebo odfotografujte mobilom</h3>
@@ -403,48 +402,38 @@ export const ImportPhotos: React.FC<ImportPhotosProps> = ({ onNavigate }) => {
             </p>
 
             <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '1.5rem', flexWrap: 'wrap' }}>
-              <button 
-                type="button"
+              <label 
+                htmlFor="mobile-camera-input"
                 className="btn btn-primary"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  document.getElementById('mobile-camera-input')?.click();
-                }}
-                style={{ padding: '0.75rem 1.5rem', fontWeight: 600 }}
+                style={{ padding: '0.75rem 1.5rem', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
               >
-                <Camera size={20} /> Odfotiť mobilom / tabletom
-              </button>
+                <Camera size={20} /> Odfotiť fotoaparátom mobilu
+                <input 
+                  id="mobile-camera-input"
+                  type="file" 
+                  accept="image/*" 
+                  capture="environment"
+                  onChange={handleLocalFileSelect}
+                  style={{ opacity: 0, width: '1px', height: '1px', position: 'absolute', pointerEvents: 'none' }}
+                />
+              </label>
 
-              <button 
-                type="button"
+              <label 
+                htmlFor="local-file-input"
                 className="btn btn-secondary"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  document.getElementById('local-file-input')?.click();
-                }}
-                style={{ padding: '0.75rem 1.5rem' }}
+                style={{ padding: '0.75rem 1.5rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
               >
                 <Image size={20} /> Vybrať z galérie súborov
-              </button>
+                <input 
+                  id="local-file-input"
+                  type="file" 
+                  multiple 
+                  accept="image/*" 
+                  onChange={handleLocalFileSelect}
+                  style={{ opacity: 0, width: '1px', height: '1px', position: 'absolute', pointerEvents: 'none' }}
+                />
+              </label>
             </div>
-
-            <input 
-              id="local-file-input"
-              type="file" 
-              multiple 
-              accept="image/*" 
-              onChange={handleLocalFileSelect}
-              style={{ display: 'none' }}
-            />
-
-            <input 
-              id="mobile-camera-input"
-              type="file" 
-              accept="image/*" 
-              capture="environment"
-              onChange={handleLocalFileSelect}
-              style={{ display: 'none' }}
-            />
           </div>
 
           {/* ZOZNAM VYBRANÝCH SÚBOROV Z ZARIADENIA */}
