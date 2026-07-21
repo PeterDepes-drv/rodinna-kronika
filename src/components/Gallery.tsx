@@ -801,7 +801,7 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
       {/* MODÁL: PRIDANIE FOTOGRAFIE */}
       {isAddModalOpen && (
         <div className="modal-overlay">
-          <div className="modal-content" style={{ gridTemplateColumns: '1fr 1.2fr', maxWidth: '950px' }}>
+          <div className="modal-content" style={{ maxWidth: '950px' }}>
             {/* Ľavá strana: Výber fotky a AI tlačidlo */}
             <div className="modal-photo-section" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', justifyContent: 'center' }}>
               {formData.storage_path ? (
@@ -860,7 +860,7 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
             </div>
 
             {/* Pravá strana: Formulár */}
-            <form onSubmit={handleSubmit} className="modal-details-section" style={{ borderLeft: '1px solid var(--border-color)' }}>
+            <form onSubmit={handleSubmit} className="modal-details-section">
               <div className="modal-header">
                 <h2>Nová spomienka</h2>
                 <button type="button" className="modal-close-btn" onClick={() => setIsAddModalOpen(false)}>
