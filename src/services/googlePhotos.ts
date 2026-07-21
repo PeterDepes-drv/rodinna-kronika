@@ -127,6 +127,12 @@ class GooglePhotosService {
     }
   }
 
+  public enableMockMode() {
+    this.accessToken = 'mock_google_token_manual';
+    localStorage.setItem('google_access_token', this.accessToken);
+    window.dispatchEvent(new Event('google-auth-change'));
+  }
+
   public logout() {
     this.accessToken = null;
     localStorage.removeItem('google_access_token');

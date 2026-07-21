@@ -171,9 +171,14 @@ export const ImportPhotos: React.FC<ImportPhotosProps> = ({ onNavigate }) => {
             </p>
           </div>
 
-          <button className="btn btn-primary" onClick={handleLogin} style={{ width: '100%', padding: '0.85rem' }}>
-            <LogIn size={18} /> Pripojiť k Google Photos
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <button className="btn btn-primary" onClick={handleLogin} style={{ width: '100%', padding: '0.85rem' }}>
+              <LogIn size={18} /> Pripojiť k Google Photos
+            </button>
+            <button className="btn btn-secondary" onClick={() => googlePhotos.enableMockMode()} style={{ width: '100%', padding: '0.85rem' }}>
+              <Image size={18} /> Vyskúšať ukážkový (demo) import fotiek
+            </button>
+          </div>
         </div>
       ) : (
         /* 2. STAV PRIHLÁSENÝ - PREHLIADANIE KNIŽNICE */
@@ -203,6 +208,11 @@ export const ImportPhotos: React.FC<ImportPhotosProps> = ({ onNavigate }) => {
                 💡 <strong>Uistite sa, že máte v Google Cloud Console povolenú službu "Photos Library API":</strong><br />
                 Prejdite do <em>Google Cloud Console -&gt; APIs &amp; Services -&gt; Enabled APIs &amp; services -&gt; + ENABLE APIS AND SERVICES</em> a vyhľadajte a povoľte <strong>Photos Library API</strong>.
               </p>
+              <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                <button className="btn btn-secondary" onClick={() => googlePhotos.enableMockMode()} style={{ width: '100%' }}>
+                  <Image size={16} /> Prepnúť na ukážkový (demo) režim a vyskúšať AI import
+                </button>
+              </div>
             </div>
           )}
 
