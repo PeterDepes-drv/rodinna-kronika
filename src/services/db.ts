@@ -218,6 +218,9 @@ export function compressImageDataUrl(dataUrl: string, maxWidth = 1600, maxHeight
   });
 }
 
+const GLOBAL_SUPABASE_URL = 'https://hqfbfqfynvisnhadzmgb.supabase.co';
+const GLOBAL_SUPABASE_KEY = 'sb_publishable_1vNsq6q08bM5hflzol9CoQ_OBWWFFsT';
+
 // --- BEŽECKÉ NASTAVENIE DATABÁZY ---
 class DatabaseService {
   private supabase: any = null;
@@ -227,12 +230,12 @@ class DatabaseService {
     this.initClient();
   }
 
-  // Inicializácia klienta na základe hodnôt v LocalStorage alebo env
+  // Inicializácia klienta na základe hodnôt v LocalStorage, env alebo globálnej konfigurácii
   public initClient() {
-    let url = import.meta.env.VITE_SUPABASE_URL || '';
-    let key = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+    let url = import.meta.env.VITE_SUPABASE_URL || GLOBAL_SUPABASE_URL;
+    let key = import.meta.env.VITE_SUPABASE_ANON_KEY || GLOBAL_SUPABASE_KEY;
 
-    // Skúsime načítať konfiguráciu z LocalStorage
+    // Skúsime načítať vlastnú konfiguráciu z LocalStorage ak existuje
     const storedConfig = localStorage.getItem('supabase_config');
     if (storedConfig) {
       try {
@@ -250,13 +253,13 @@ class DatabaseService {
       try {
         this.supabase = createClient(url, key);
         this.isUsingSupabase = true;
-        console.log('Supabase klient bol úspešne pripojený.');
+        console.log('Supabase klient bol úspešne pripojený k centrálnej cloudovej databáze.');
       } catch (e) {
         console.error('Zlyhala inicializácia Supabase klienta. Prechádzam na lokálny režim.', e);
         this.isUsingSupabase = false;
       }
     } else {
-      console.log('Chýbajú Supabase prihlasovacie údaje. Aplikácia beží v LOKÁLNOM MOCK REŽIME (LocalStorage).');
+      console.log('Chýbajú Supabase prihlasovacie údaje. Aplikácia beží v LOKÁLNOM REŽIME.');
       this.isUsingSupabase = false;
       this.initLocalStorageMock();
     }
