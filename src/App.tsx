@@ -12,7 +12,10 @@ import {
   ChevronRight,
   Play,
   Pause,
-  X
+  X,
+  User,
+  LogIn,
+  LogOut
 } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { Gallery } from './components/Gallery';
@@ -22,10 +25,24 @@ import { Presentations } from './components/Presentations';
 import { ImportPhotos } from './components/ImportPhotos';
 import { Settings } from './components/Settings';
 import type { Photo } from './services/db';
+import { authService } from './services/auth';
+import type { UserSession } from './services/auth';
+import { AuthModal } from './components/AuthModal';
 
 function App() {
   const [activeView, setActiveView] = useState<string>('dashboard');
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
+
+  // E-mailové prihlásenie pre rodinu
+  const [userSession, setUserSession] = useState<UserSession | null>(authService.getSession());
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = authService.subscribe((session) => {
+      setUserSession(session);
+    });
+    return unsubscribe;
+  }, []);
 
   // Stavy pre celoobrazovkovú prezentáciu (Slideshow)
   const [slideshowPhotos, setSlideshowPhotos] = useState<Photo[]>([]);
@@ -192,6 +209,31 @@ function App() {
         </nav>
 
         <div className="sidebar-footer">
+          {userSession ? (
+            <div style={{ marginBottom: '1rem', padding: '0.65rem 0.85rem', backgroundColor: 'rgba(167, 139, 250, 0.1)', border: '1px solid rgba(167, 139, 250, 0.25)', borderRadius: '8px', textAlign: 'left' }}>
+              <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'white', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <User size={14} style={{ color: '#a78bfa' }} /> {userSession.name || userSession.email.split('@')[0]}
+              </div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '0.15rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {userSession.email}
+              </div>
+              <button 
+                onClick={() => authService.logout()} 
+                style={{ marginTop: '0.5rem', background: 'none', border: 'none', color: 'var(--danger)', fontSize: '0.75rem', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+              >
+                <LogOut size={12} /> Odhlásiť sa
+              </button>
+            </div>
+          ) : (
+            <button 
+              onClick={() => setIsAuthModalOpen(true)}
+              className="btn btn-secondary"
+              style={{ width: '100%', marginBottom: '1rem', fontSize: '0.8rem', padding: '0.55rem 0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+            >
+              <LogIn size={14} /> Prihlásiť sa cez e-mail
+            </button>
+          )}
+
           <p>Vyrobené s <Heart size={10} style={{ color: 'red', display: 'inline' }} /> pre našu rodinu</p>
           <p style={{ marginTop: '0.25rem', fontSize: '0.7rem' }}>v. 1.0.0 (2026)</p>
         </div>
@@ -280,6 +322,9 @@ function App() {
           )}
         </div>
       )}
+
+      {/* MODÁLNE OKNO PRE E-MAILOVÉ PRIHLÁSENIE */}
+      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
     </div>
   );
 }
