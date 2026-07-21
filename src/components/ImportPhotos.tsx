@@ -56,6 +56,27 @@ export const ImportPhotos: React.FC<ImportPhotosProps> = ({ onNavigate }) => {
     googlePhotos.login();
   };
 
+  const handleOpenPicker = async () => {
+    try {
+      setLoading(true);
+      const geminiConfig = localStorage.getItem('gemini_config');
+      let apiKey = '';
+      if (geminiConfig) {
+        try { apiKey = JSON.parse(geminiConfig).apiKey || ''; } catch {}
+      }
+      await googlePhotos.openPicker(apiKey, (pickedItems) => {
+        setPhotosState(prev => ({
+          items: [...pickedItems, ...prev.items]
+        }));
+        setSelectedIds(pickedItems.map(p => p.id));
+      });
+    } catch (e) {
+      alert('Nie je možné otvoriť Google Photos Picker: ' + (e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleLogout = () => {
     googlePhotos.logout();
     setPhotosState({ items: [] });
@@ -189,7 +210,10 @@ export const ImportPhotos: React.FC<ImportPhotosProps> = ({ onNavigate }) => {
               <h3>Pripojené ku Google Photos</h3>
               <p style={{ fontSize: '0.85rem' }}>Vyberte fotografie, ktoré si prajete pridať do rodinnej kroniky.</p>
             </div>
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <button className="btn btn-primary" onClick={handleOpenPicker} disabled={loading || importing}>
+                <Image size={16} /> Otvoriť výber Google Photos (Picker)
+              </button>
               <button className="btn btn-secondary" onClick={checkStatusAndLoad} disabled={loading || importing}>
                 <RefreshCw size={16} /> Obnoviť
               </button>

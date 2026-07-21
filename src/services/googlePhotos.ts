@@ -133,6 +133,71 @@ class GooglePhotosService {
     window.dispatchEvent(new Event('google-auth-change'));
   }
 
+  public loadGapiScript(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if ((window as any).gapi && (window as any).google?.picker) {
+        return resolve();
+      }
+      const existingScript = document.getElementById('gapi-picker-script');
+      if (existingScript) {
+        existingScript.addEventListener('load', () => resolve());
+        return;
+      }
+      const script = document.createElement('script');
+      script.id = 'gapi-picker-script';
+      script.src = 'https://apis.google.com/js/api.js';
+      script.onload = () => {
+        (window as any).gapi.load('picker', () => resolve());
+      };
+      script.onerror = reject;
+      document.body.appendChild(script);
+    });
+  }
+
+  public async openPicker(developerKey: string, onSelect: (items: GooglePhotoItem[]) => void): Promise<void> {
+    await this.loadGapiScript();
+    
+    const token = this.accessToken;
+    if (!token) {
+      throw new Error('Pre otvorenie Google Picker je potrebné prihlásenie.');
+    }
+
+    try {
+      const pickerBuilder = new (window as any).google.picker.PickerBuilder()
+        .addView((window as any).google.picker.ViewId.PHOTOS)
+        .addView((window as any).google.picker.ViewId.PHOTO_ALBUMS)
+        .setOAuthToken(token);
+
+      if (developerKey) {
+        pickerBuilder.setDeveloperKey(developerKey);
+      }
+
+      const picker = pickerBuilder
+        .setCallback((data: any) => {
+          if (data.action === (window as any).google.picker.Action.PICKED) {
+            const documents = data.docs || [];
+            const items: GooglePhotoItem[] = documents.map((doc: any) => ({
+              id: doc.id || ('gpicker_' + Math.random().toString(36).substr(2, 9)),
+              baseUrl: doc.url || doc.thumbnails?.[0]?.url || '',
+              filename: doc.name || 'google_photo.jpg',
+              mimeType: doc.mimeType || 'image/jpeg',
+              creationTime: new Date().toISOString(),
+              width: doc.width || '1200',
+              height: doc.height || '900',
+              description: doc.description || doc.name || ''
+            }));
+            onSelect(items);
+          }
+        })
+        .build();
+
+      picker.setVisible(true);
+    } catch (e) {
+      console.error('Chyba pri spúšťaní Google Picker:', e);
+      throw e;
+    }
+  }
+
   public logout() {
     this.accessToken = null;
     localStorage.removeItem('google_access_token');
