@@ -102,7 +102,7 @@ class GooglePhotosService {
     }
 
     const redirectUri = window.location.origin;
-    const scope = 'https://www.googleapis.com/auth/photoslibrary.readonly';
+    const scope = 'https://www.googleapis.com/auth/photoslibrary.readonly https://www.googleapis.com/auth/photoslibrary';
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(
       this.clientId
     )}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(scope)}&prompt=consent`;
