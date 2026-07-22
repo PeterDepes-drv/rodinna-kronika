@@ -283,133 +283,244 @@ export const People: React.FC<PeopleProps> = ({ onSelectPhoto, userSession }) =>
                   </div>
                 </>
               ) : (
-                /* Zobrazenie Rodokmeňa (Vizuálny strom vzťahov) */
-                <div className="panel" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2rem', padding: '2.5rem 1.5rem', background: 'rgba(30, 27, 75, 0.25)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)' }}>
-                  <h2 style={{ color: '#a78bfa', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
-                    <Users size={22} /> Rodokmeň pre: {selectedPerson.name}
-                  </h2>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', textAlign: 'center', maxWidth: '600px', margin: '0 0 1rem 0' }}>
-                    Kliknutím na príbuzného sa okamžite presuniete na jeho profil a rodokmeň.
-                  </p>
+                /* Zobrazenie Rodokmeňa (Vizuálny interaktívny strom) */
+                <div className="panel" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', padding: '2rem 1.5rem', background: 'rgba(15, 23, 42, 0.4)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)' }}>
+                  <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                    <h2 style={{ color: '#a78bfa', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', margin: 0 }}>
+                      <Users size={22} /> Vizuálny rodokmeň: {selectedPerson.name}
+                    </h2>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.25rem', margin: 0 }}>
+                      Kliknutím na ľubovoľného člena rodokmeňa sa strom automaticky vycentruje a prekreslí okolo neho.
+                    </p>
+                  </div>
 
-                  {/* Level 1: Rodičia */}
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#a78bfa', marginBottom: '0.75rem' }}>Rodičia</span>
-                    <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-                      {/* Otec */}
+                  {/* SVG Rodokmeň Canvas s posúvaním na menších obrazovkách */}
+                  <div style={{ width: '100%', overflowX: 'auto', background: 'rgba(0, 0, 0, 0.25)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                    <div style={{ minWidth: '1000px', padding: '20px 10px' }}>
                       {(() => {
                         const father = people.find(p => p.id === selectedPerson.father_id);
-                        return father ? (
-                          <div className="stat-card" style={{ cursor: 'pointer', border: '1px solid rgba(167, 139, 250, 0.2)', padding: '0.75rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: '200px', background: 'rgba(255,255,255,0.02)' }} onClick={() => handleSelectPerson(father)}>
-                            <img src={father.photo_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100'} alt={father.name} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
-                            <div style={{ textAlign: 'left' }}>
-                              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'white' }}>{father.name}</div>
-                              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Otec</div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="stat-card" style={{ opacity: 0.4, padding: '0.75rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: '200px', background: 'rgba(255,255,255,0.01)', border: '1px dashed var(--border-color)' }}>
-                            <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', fontWeight: 'bold' }}>?</div>
-                            <div style={{ textAlign: 'left' }}>
-                              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Neznámy otec</div>
-                              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Otec</div>
-                            </div>
-                          </div>
-                        );
-                      })()}
-
-                      {/* Matka */}
-                      {(() => {
                         const mother = people.find(p => p.id === selectedPerson.mother_id);
-                        return mother ? (
-                          <div className="stat-card" style={{ cursor: 'pointer', border: '1px solid rgba(167, 139, 250, 0.2)', padding: '0.75rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: '200px', background: 'rgba(255,255,255,0.02)' }} onClick={() => handleSelectPerson(mother)}>
-                            <img src={mother.photo_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100'} alt={mother.name} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
-                            <div style={{ textAlign: 'left' }}>
-                              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'white' }}>{mother.name}</div>
-                              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Matka</div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="stat-card" style={{ opacity: 0.4, padding: '0.75rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: '200px', background: 'rgba(255,255,255,0.01)', border: '1px dashed var(--border-color)' }}>
-                            <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', fontWeight: 'bold' }}>?</div>
-                            <div style={{ textAlign: 'left' }}>
-                              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Neznáma matka</div>
-                              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Matka</div>
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  </div>
-
-                  {/* Spojovacia šípka */}
-                  <div style={{ fontSize: '1.5rem', color: 'rgba(167, 139, 250, 0.4)', marginTop: '-1rem', marginBottom: '-1rem' }}>↓</div>
-
-                  {/* Level 2: Vybraná osoba & Partner */}
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#fb7185', marginBottom: '0.75rem' }}>Vybraná osoba a Partner</span>
-                    <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
-                      
-                      {/* Vybraná osoba */}
-                      <div className="stat-card active-person" style={{ border: '2px solid #a78bfa', background: 'linear-gradient(135deg, rgba(46, 16, 101, 0.5) 0%, rgba(30, 27, 75, 0.5) 100%)', padding: '0.85rem 1.5rem', display: 'flex', alignItems: 'center', gap: '0.85rem', minWidth: '220px', boxShadow: '0 0 15px rgba(167, 139, 250, 0.25)' }}>
-                        <img src={selectedPerson.photo_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100'} alt={selectedPerson.name} style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #a78bfa' }} />
-                        <div style={{ textAlign: 'left' }}>
-                          <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'white' }}>{selectedPerson.name}</div>
-                          <div style={{ fontSize: '0.75rem', color: '#a78bfa', fontWeight: 600 }}>{selectedPerson.relationship || 'Člen rodiny'}</div>
-                        </div>
-                      </div>
-
-                      {/* Ikona srdca */}
-                      <div style={{ fontSize: '1.25rem', color: '#fb7185', animation: 'pulse 2s infinite' }}>❤️</div>
-
-                      {/* Partner */}
-                      {(() => {
                         const spouse = people.find(p => p.id === selectedPerson.spouse_id) || people.find(p => p.spouse_id === selectedPerson.id);
-                        return spouse ? (
-                          <div className="stat-card" style={{ cursor: 'pointer', border: '1px solid rgba(251, 113, 133, 0.3)', padding: '0.85rem 1.5rem', display: 'flex', alignItems: 'center', gap: '0.85rem', minWidth: '220px', background: 'rgba(255,255,255,0.02)' }} onClick={() => handleSelectPerson(spouse)}>
-                            <img src={spouse.photo_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100'} alt={spouse.name} style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }} />
-                            <div style={{ textAlign: 'left' }}>
-                              <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'white' }}>{spouse.name}</div>
-                              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Partner / Manžel</div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="stat-card" style={{ opacity: 0.4, padding: '0.85rem 1.5rem', display: 'flex', alignItems: 'center', gap: '0.85rem', minWidth: '220px', background: 'rgba(255,255,255,0.01)', border: '1px dashed var(--border-color)' }}>
-                            <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', fontWeight: 'bold' }}>?</div>
-                            <div style={{ textAlign: 'left' }}>
-                              <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Nepriradený partner</div>
-                              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Partner / Manžel</div>
-                            </div>
-                          </div>
+                        const children = people.filter(p => p.father_id === selectedPerson.id || p.mother_id === selectedPerson.id);
+                        const siblings = people.filter(p => p.id !== selectedPerson.id && (
+                          (selectedPerson.father_id && p.father_id === selectedPerson.father_id) ||
+                          (selectedPerson.mother_id && p.mother_id === selectedPerson.mother_id)
+                        ));
+
+                        const patGF = father ? (people.find(p => p.id === father.father_id) || null) : null;
+                        const patGM = father ? (people.find(p => p.id === father.mother_id) || null) : null;
+                        const matGF = mother ? (people.find(p => p.id === mother.father_id) || null) : null;
+                        const matGM = mother ? (people.find(p => p.id === mother.mother_id) || null) : null;
+
+                        const centerX = 500;
+                        const spouseOffset = 90;
+                        
+                        const yGrandparents = 50;
+                        const yParents = 170;
+                        const ySelected = 290;
+                        const yChildren = 410;
+
+                        const xSelected = centerX - spouseOffset;
+                        const xSpouse = centerX + spouseOffset;
+
+                        const xFather = 320;
+                        const xMother = 480;
+
+                        const xPatGF = 160;
+                        const xPatGM = 280;
+                        const xMatGF = 520;
+                        const xMatGM = 640;
+
+                        const siblingXCoords = siblings.map((_, idx) => 240 - idx * 155);
+
+                        const getChildrenX = (count: number) => {
+                          if (count === 0) return [];
+                          if (count === 1) return [500];
+                          const spacing = 155;
+                          const startX = 500 - ((count - 1) * spacing) / 2;
+                          return Array.from({ length: count }, (_, i) => startX + i * spacing);
+                        };
+                        const childXCoords = getChildrenX(children.length);
+
+                        const renderNodeCard = (p: Person | null, x: number, y: number, roleLabel: string, isRoot: boolean = false) => {
+                          const w = 145;
+                          const h = 76;
+                          const left = x - w / 2;
+                          const top = y - h / 2;
+
+                          if (!p) {
+                            return (
+                              <foreignObject x={left} y={top} width={w} height={h} key={`${roleLabel}-${x}-${y}`}>
+                                <div style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  borderRadius: '10px',
+                                  border: '1px dashed rgba(255, 255, 255, 0.12)',
+                                  background: 'rgba(255, 255, 255, 0.01)',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: 'var(--text-muted)',
+                                  fontSize: '0.72rem',
+                                  textAlign: 'center',
+                                  padding: '4px'
+                                }}>
+                                  <span style={{ fontWeight: 600, opacity: 0.4 }}>?</span>
+                                  <span style={{ fontSize: '0.62rem', opacity: 0.5, marginTop: '2px' }}>{roleLabel}</span>
+                                </div>
+                              </foreignObject>
+                            );
+                          }
+
+                          return (
+                            <foreignObject x={left} y={top} width={w} height={h} key={p.id}>
+                              <div 
+                                onClick={() => handleSelectPerson(p)}
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  borderRadius: '10px',
+                                  border: isRoot ? '2px solid var(--accent)' : '1px solid rgba(255, 255, 255, 0.08)',
+                                  background: isRoot 
+                                    ? 'linear-gradient(135deg, rgba(124, 58, 237, 0.3) 0%, rgba(76, 29, 149, 0.4) 100%)' 
+                                    : 'rgba(15, 23, 42, 0.75)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  padding: '8px',
+                                  gap: '8px',
+                                  cursor: 'pointer',
+                                  userSelect: 'none',
+                                  transition: 'transform 0.15s, border-color 0.15s, box-shadow 0.15s',
+                                  boxShadow: isRoot ? '0 0 12px rgba(139, 92, 246, 0.35)' : '0 4px 6px -1px rgba(0,0,0,0.1)',
+                                  overflow: 'hidden'
+                                }}
+                                onMouseEnter={(e) => { 
+                                  e.currentTarget.style.transform = 'scale(1.04)';
+                                  e.currentTarget.style.borderColor = 'rgba(167, 139, 250, 0.5)';
+                                  e.currentTarget.style.boxShadow = '0 0 8px rgba(167, 139, 250, 0.2)';
+                                }}
+                                onMouseLeave={(e) => { 
+                                  e.currentTarget.style.transform = 'scale(1)';
+                                  e.currentTarget.style.borderColor = isRoot ? 'var(--accent)' : 'rgba(255, 255, 255, 0.08)';
+                                  e.currentTarget.style.boxShadow = isRoot ? '0 0 12px rgba(139, 92, 246, 0.35)' : 'none';
+                                }}
+                              >
+                                <img 
+                                  src={p.photo_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100'} 
+                                  alt={p.name} 
+                                  style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border-color)', flexShrink: 0 }} 
+                                />
+                                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.name}>
+                                    {p.name}
+                                  </div>
+                                  <div style={{ fontSize: '0.62rem', color: isRoot ? '#c084fc' : 'var(--text-secondary)', marginTop: '1px' }}>
+                                    {roleLabel}
+                                  </div>
+                                  {p.birth_date && (
+                                    <div style={{ fontSize: '0.58rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                      * {new Date(p.birth_date).getFullYear()}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </foreignObject>
+                          );
+                        };
+
+                        return (
+                          <svg width="1000" height="470" viewBox="0 0 1000 470" style={{ display: 'block', margin: '0 auto' }}>
+                            <defs>
+                              <linearGradient id="lineGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                  <stop offset="0%" stopColor="rgba(167, 139, 250, 0.2)" />
+                                  <stop offset="100%" stopColor="rgba(167, 139, 250, 0.7)" />
+                              </linearGradient>
+                            </defs>
+
+                            {/* --- SPOJENIA STARÍ RODIČIA -> RODIČIA --- */}
+                            {father && (patGF || patGM) && (
+                              <g>
+                                <line x1={xPatGF} y1={yGrandparents} x2={xPatGM} y2={yGrandparents} stroke="rgba(255,255,255,0.12)" strokeWidth="1.5" strokeDasharray="3,3" />
+                                <line x1={(xPatGF + xPatGM)/2} y1={yGrandparents} x2={(xPatGF + xPatGM)/2} y2={(yGrandparents + yParents)/2} stroke="rgba(255,255,255,0.15)" strokeWidth="1.5" />
+                                <line x1={(xPatGF + xPatGM)/2} y1={(yGrandparents + yParents)/2} x2={xFather} y2={(yGrandparents + yParents)/2} stroke="rgba(255,255,255,0.15)" strokeWidth="1.5" />
+                                <line x1={xFather} y1={(yGrandparents + yParents)/2} x2={xFather} y2={yParents - 38} stroke="rgba(255,255,255,0.15)" strokeWidth="1.5" />
+                              </g>
+                            )}
+
+                            {mother && (matGF || matGM) && (
+                              <g>
+                                <line x1={xMatGF} y1={yGrandparents} x2={xMatGM} y2={yGrandparents} stroke="rgba(255,255,255,0.12)" strokeWidth="1.5" strokeDasharray="3,3" />
+                                <line x1={(xMatGF + xMatGM)/2} y1={yGrandparents} x2={(xMatGM + xMatGF)/2} y2={(yGrandparents + yParents)/2} stroke="rgba(255,255,255,0.15)" strokeWidth="1.5" />
+                                <line x1={(xMatGF + xMatGM)/2} y1={(yGrandparents + yParents)/2} x2={xMother} y2={(yGrandparents + yParents)/2} stroke="rgba(255,255,255,0.15)" strokeWidth="1.5" />
+                                <line x1={xMother} y1={(yGrandparents + yParents)/2} x2={xMother} y2={yParents - 38} stroke="rgba(255,255,255,0.15)" strokeWidth="1.5" />
+                              </g>
+                            )}
+
+                            {/* --- SPOJENIA RODIČIA -> VYBRANÁ OSOBA & SÚRODENCI --- */}
+                            {(father || mother) && (
+                              <g>
+                                <line x1={xFather} y1={yParents} x2={xMother} y2={yParents} stroke="#fb7185" strokeWidth="1.5" strokeDasharray="3,3" />
+                                <text x={(xFather + xMother)/2} y={yParents + 4} textAnchor="middle" style={{ fontSize: '10px', fill: '#fb7185' }}>❤️</text>
+                                
+                                <line x1={(xFather + xMother)/2} y1={yParents} x2={(xFather + xMother)/2} y2={(yParents + ySelected)/2} stroke="rgba(167, 139, 250, 0.4)" strokeWidth="1.5" />
+                                
+                                {(() => {
+                                  const childXPositions = [xSelected, ...siblingXCoords];
+                                  const minX = Math.min(...childXPositions);
+                                  const maxX = Math.max(...childXPositions);
+                                  return (
+                                    <g>
+                                      <line x1={minX} y1={(yParents + ySelected)/2} x2={maxX} y2={(yParents + ySelected)/2} stroke="rgba(167, 139, 250, 0.4)" strokeWidth="1.5" />
+                                      {childXPositions.map((x, i) => (
+                                        <line key={i} x1={x} y1={(yParents + ySelected)/2} x2={x} y2={ySelected - 38} stroke="rgba(167, 139, 250, 0.4)" strokeWidth="1.5" />
+                                      ))}
+                                    </g>
+                                  );
+                                })()}
+                              </g>
+                            )}
+
+                            {/* --- SPOJENIA VYBRANÁ OSOBA & PARTNER -> DETI --- */}
+                            {
+                              <g>
+                                <line x1={xSelected} y1={ySelected} x2={xSpouse} y2={ySelected} stroke="#fb7185" strokeWidth="1.8" strokeDasharray="3,3" />
+                                <text x={centerX} y={ySelected + 4} textAnchor="middle" style={{ fontSize: '12px', fill: '#fb7185' }}>❤️</text>
+                                
+                                {children.length > 0 && (
+                                  <g>
+                                    <line x1={centerX} y1={ySelected} x2={centerX} y2={(ySelected + yChildren)/2} stroke="rgba(16, 185, 129, 0.5)" strokeWidth="1.8" />
+                                    <line x1={Math.min(...childXCoords)} y1={(ySelected + yChildren)/2} x2={Math.max(...childXCoords)} y2={(ySelected + yChildren)/2} stroke="rgba(16, 185, 129, 0.5)" strokeWidth="1.8" />
+                                    {childXCoords.map((x, i) => (
+                                      <line key={i} x1={x} y1={(ySelected + yChildren)/2} x2={x} y2={yChildren - 38} stroke="rgba(16, 185, 129, 0.5)" strokeWidth="1.8" />
+                                    ))}
+                                  </g>
+                                )}
+                              </g>
+                            }
+
+                            {/* --- RENDER UZLOV (KARIET) --- */}
+                            {/* Generácia 1: Starí rodičia */}
+                            {renderNodeCard(patGF, xPatGF, yGrandparents, 'Starý otec')}
+                            {renderNodeCard(patGM, xPatGM, yGrandparents, 'Stará mama')}
+                            {renderNodeCard(matGF, xMatGF, yGrandparents, 'Starý otec')}
+                            {renderNodeCard(matGM, xMatGM, yGrandparents, 'Stará mama')}
+
+                            {/* Generácia 2: Rodičia */}
+                            {renderNodeCard(father || null, xFather, yParents, 'Otec')}
+                            {renderNodeCard(mother || null, xMother, yParents, 'Matka')}
+
+                            {/* Generácia 3: Vybraná osoba, partner a súrodenci */}
+                            {renderNodeCard(selectedPerson, xSelected, ySelected, selectedPerson.relationship || 'Vybraná osoba', true)}
+                            {renderNodeCard(spouse || null, xSpouse, ySelected, 'Partner / Manžel')}
+                            {siblings.map((sib, i) => renderNodeCard(sib, siblingXCoords[i], ySelected, sib.relationship || 'Súrodenec'))}
+
+                            {/* Generácia 4: Deti */}
+                            {children.map((child, i) => renderNodeCard(child, childXCoords[i], yChildren, 'Dieťa'))}
+                          </svg>
                         );
                       })()}
                     </div>
-                  </div>
-
-                  {/* Spojovacia šípka */}
-                  <div style={{ fontSize: '1.5rem', color: 'rgba(167, 139, 250, 0.4)', marginTop: '-1rem', marginBottom: '-1rem' }}>↓</div>
-
-                  {/* Level 3: Deti */}
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#10b981', marginBottom: '0.75rem' }}>Deti</span>
-                    {(() => {
-                      const children = people.filter(p => p.father_id === selectedPerson.id || p.mother_id === selectedPerson.id);
-                      return children.length > 0 ? (
-                        <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-                          {children.map(child => (
-                            <div key={child.id} className="stat-card" style={{ cursor: 'pointer', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '0.75rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: '200px', background: 'rgba(255,255,255,0.02)' }} onClick={() => handleSelectPerson(child)}>
-                              <img src={child.photo_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100'} alt={child.name} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
-                              <div style={{ textAlign: 'left' }}>
-                                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'white' }}>{child.name}</div>
-                                <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Dieťa</div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontStyle: 'italic' }}>Zatiaľ neboli zaznamenané žiadne deti.</p>
-                      );
-                    })()}
                   </div>
                 </div>
               )}
