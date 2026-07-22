@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { db } from '../services/db';
 import type { Album, Photo } from '../services/db';
-import { Plus, BookOpen, Play, Printer, X, PlusCircle, CheckCircle, Trash2, ArrowLeft } from 'lucide-react';
-
+import { Plus, BookOpen, Play, Printer, X, PlusCircle, CheckCircle, Trash2, ArrowLeft, Lock } from 'lucide-react';
 interface PresentationsProps {
   onStartSlideshow: (photos: Photo[], title: string) => void;
   onSelectPhoto: (photo: Photo) => void;
@@ -24,6 +23,16 @@ export const Presentations: React.FC<PresentationsProps> = ({ onStartSlideshow, 
   // Formulár pre album
   const [newAlbumTitle, setNewAlbumTitle] = useState('');
   const [newAlbumDesc, setNewAlbumDesc] = useState('');
+  const [newAlbumIsPublic, setNewAlbumIsPublic] = useState(true);
+
+  const isAlbumPublic = (album: Album) => {
+    return album.is_public !== false && !album.description?.startsWith('[PRIVATE_ALBUM]');
+  };
+
+  const getCleanDescription = (desc: string) => {
+    if (!desc) return '';
+    return desc.replace('[PRIVATE_ALBUM]', '').trim();
+  };
 
   const loadAlbumsData = async () => {
     try {
@@ -61,9 +70,10 @@ export const Presentations: React.FC<PresentationsProps> = ({ onStartSlideshow, 
     e.preventDefault();
     if (!newAlbumTitle.trim()) return;
     try {
-      await db.addAlbum(newAlbumTitle, newAlbumDesc);
+      await db.addAlbum(newAlbumTitle, newAlbumDesc, newAlbumIsPublic);
       setNewAlbumTitle('');
       setNewAlbumDesc('');
+      setNewAlbumIsPublic(true);
       setIsAddAlbumOpen(false);
       loadAlbumsData();
     } catch (e) {
@@ -195,8 +205,15 @@ export const Presentations: React.FC<PresentationsProps> = ({ onStartSlideshow, 
               </div>
 
               <div className="panel" style={{ marginBottom: '2rem' }}>
-                <h1 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>{selectedAlbum.title}</h1>
-                <p>{selectedAlbum.description || 'K tomuto albumu zatiaľ nie je priradený popis.'}</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+                  <h1 style={{ fontSize: '2rem', margin: 0 }}>{selectedAlbum.title}</h1>
+                  {!isAlbumPublic(selectedAlbum) && (
+                    <span className="tag-badge" style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', borderColor: 'var(--danger)', color: '#ef4444', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <Lock size={12} /> SÚKROMNÝ ALBUM
+                    </span>
+                  )}
+                </div>
+                <p>{getCleanDescription(selectedAlbum.description) || 'K tomuto albumu zatiaľ nie je priradený popis.'}</p>
                 <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
                     Počet fotografií: <strong>{albumPhotos.length}</strong>
@@ -315,38 +332,51 @@ export const Presentations: React.FC<PresentationsProps> = ({ onStartSlideshow, 
             )}
           </div>
 
-          {albums.length === 0 ? (
-            <div className="empty-state panel">
-              <BookOpen size={48} className="empty-state-icon" />
-              <h3>Žiadne albumy</h3>
-              <p className="mt-4">Zatiaľ ste nevytvorili žiadny album. Začnite kliknutím na tlačidlo hore.</p>
-            </div>
-          ) : (
-            <div className="gallery-grid">
-              {albums.map(album => (
-                <div 
-                  key={album.id} 
-                  className="photo-card"
-                  onClick={() => handleSelectAlbum(album)}
-                >
-                  <div className="photo-wrapper">
-                    <img 
-                      src={album.cover_photo_path || 'https://images.unsplash.com/photo-1513694203232-719a280e022f?q=80&w=600'} 
-                      alt={album.title} 
-                      className="photo-img" 
-                    />
-                    <span className="photo-badge" style={{ backgroundColor: 'var(--accent)' }}>Album</span>
-                  </div>
-                  <div className="photo-card-info">
-                    <h3 className="photo-title">{album.title}</h3>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', minHeight: '36px' }}>
-                      {album.description || 'Bez popisu.'}
-                    </p>
-                  </div>
+          {(() => {
+            const visibleAlbums = albums.filter(album => isAlbumPublic(album) || userSession);
+            
+            if (visibleAlbums.length === 0) {
+              return (
+                <div className="empty-state panel">
+                  <BookOpen size={48} className="empty-state-icon" />
+                  <h3>Žiadne albumy</h3>
+                  <p className="mt-4">Zatiaľ nie sú vytvorené žiadne verejné albumy.</p>
                 </div>
-              ))}
-            </div>
-          )}
+              );
+            }
+
+            return (
+              <div className="gallery-grid">
+                {visibleAlbums.map(album => (
+                  <div 
+                    key={album.id} 
+                    className="photo-card"
+                    onClick={() => handleSelectAlbum(album)}
+                  >
+                    <div className="photo-wrapper">
+                      <img 
+                        src={album.cover_photo_path || 'https://images.unsplash.com/photo-1513694203232-719a280e022f?q=80&w=600'} 
+                        alt={album.title} 
+                        className="photo-img" 
+                      />
+                      <span className="photo-badge" style={{ backgroundColor: 'var(--accent)' }}>Album</span>
+                      {!isAlbumPublic(album) && (
+                        <span className="photo-badge" style={{ backgroundColor: '#ef4444', right: 'auto', left: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                          <Lock size={10} /> Súkromný
+                        </span>
+                      )}
+                    </div>
+                    <div className="photo-card-info">
+                      <h3 className="photo-title">{album.title}</h3>
+                      <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', minHeight: '36px' }}>
+                        {getCleanDescription(album.description) || 'Bez popisu.'}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
 
           {/* MODÁL: NOVÝ ALBUM */}
           {isAddAlbumOpen && (
@@ -380,6 +410,30 @@ export const Presentations: React.FC<PresentationsProps> = ({ onStartSlideshow, 
                     value={newAlbumDesc}
                     onChange={(e) => setNewAlbumDesc(e.target.value)}
                   />
+                </div>
+
+                <div className="form-group">
+                  <label>Viditeľnosť albumu</label>
+                  <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.9rem' }}>
+                      <input 
+                        type="radio" 
+                        name="isPublic" 
+                        checked={newAlbumIsPublic} 
+                        onChange={() => setNewAlbumIsPublic(true)} 
+                      />
+                      <span>🔓 Verejný (vidí celá rodina)</span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.9rem' }}>
+                      <input 
+                        type="radio" 
+                        name="isPublic" 
+                        checked={!newAlbumIsPublic} 
+                        onChange={() => setNewAlbumIsPublic(false)} 
+                      />
+                      <span>🔒 Súkromný (iba po prihlásení)</span>
+                    </label>
+                  </div>
                 </div>
 
                 <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>

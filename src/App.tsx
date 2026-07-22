@@ -170,9 +170,9 @@ function App() {
           />
         );
       case 'timeline':
-        return <Timeline onSelectPhoto={handleSelectPhoto} />;
+        return <Timeline onSelectPhoto={handleSelectPhoto} userSession={userSession} />;
       case 'map':
-        return <MapMemories onSelectPhoto={handleSelectPhoto} />;
+        return <MapMemories onSelectPhoto={handleSelectPhoto} userSession={userSession} />;
       case 'people':
         return <People onSelectPhoto={handleSelectPhoto} userSession={userSession} />;
       case 'presentations':

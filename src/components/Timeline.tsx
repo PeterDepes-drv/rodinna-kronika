@@ -5,9 +5,10 @@ import { Calendar, MapPin, AlertCircle, ArrowUp } from 'lucide-react';
 
 interface TimelineProps {
   onSelectPhoto: (photo: Photo) => void;
+  userSession?: any;
 }
 
-export const Timeline: React.FC<TimelineProps> = ({ onSelectPhoto }) => {
+export const Timeline: React.FC<TimelineProps> = ({ onSelectPhoto, userSession }) => {
   const [timelineData, setTimelineData] = useState<Record<number, Photo[]>>({});
   const [loading, setLoading] = useState(true);
   const [isEmpty, setIsEmpty] = useState(false);
@@ -15,7 +16,11 @@ export const Timeline: React.FC<TimelineProps> = ({ onSelectPhoto }) => {
   const loadTimeline = async () => {
     try {
       setLoading(true);
-      const photos = await db.getPhotos();
+      let photos = await db.getPhotos();
+      const privatePhotoIds = await db.getPrivatePhotoIds(userSession);
+      if (privatePhotoIds.size > 0) {
+        photos = photos.filter(p => !privatePhotoIds.has(p.id));
+      }
       
       if (photos.length === 0) {
         setIsEmpty(true);

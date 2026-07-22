@@ -7,6 +7,7 @@ import 'leaflet/dist/leaflet.css';
 
 interface MapMemoriesProps {
   onSelectPhoto: (photo: Photo) => void;
+  userSession?: any;
 }
 
 interface LocationGroup {
@@ -16,7 +17,7 @@ interface LocationGroup {
   photos: Photo[];
 }
 
-export const MapMemories: React.FC<MapMemoriesProps> = ({ onSelectPhoto }) => {
+export const MapMemories: React.FC<MapMemoriesProps> = ({ onSelectPhoto, userSession }) => {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
   const [geocodingProgress, setGeocodingProgress] = useState('');
@@ -29,7 +30,11 @@ export const MapMemories: React.FC<MapMemoriesProps> = ({ onSelectPhoto }) => {
     const initMapData = async () => {
       try {
         setLoading(true);
-        const allPhotos = await db.getPhotos();
+        let allPhotos = await db.getPhotos();
+        const privatePhotoIds = await db.getPrivatePhotoIds(userSession);
+        if (privatePhotoIds.size > 0) {
+          allPhotos = allPhotos.filter(p => !privatePhotoIds.has(p.id));
+        }
         const photosWithLocation = allPhotos.filter(p => p.location && p.location.trim().length > 0);
         setPhotos(photosWithLocation);
 

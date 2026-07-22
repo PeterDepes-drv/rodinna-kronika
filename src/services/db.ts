@@ -53,6 +53,7 @@ export interface Album {
   description: string;
   cover_photo_path?: string;
   created_at: string;
+  is_public?: boolean;
 }
 
 export interface SupabaseConfig {
@@ -679,10 +680,25 @@ class DatabaseService {
         .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return data as Album[];
+      
+      const processed = (data || []).map((album: any) => {
+        const isPrivateDesc = album.description && album.description.startsWith('[PRIVATE_ALBUM]');
+        return {
+          ...album,
+          is_public: album.is_public !== undefined ? album.is_public : !isPrivateDesc
+        } as Album;
+      });
+      return processed;
     } else {
       const local = localStorage.getItem('kronika_albums');
-      return local ? JSON.parse(local) : [];
+      const parsed = local ? JSON.parse(local) as Album[] : [];
+      return parsed.map(album => {
+        const isPrivateDesc = album.description && album.description.startsWith('[PRIVATE_ALBUM]');
+        return {
+          ...album,
+          is_public: album.is_public !== undefined ? album.is_public : !isPrivateDesc
+        };
+      });
     }
   }
 
@@ -712,22 +728,81 @@ class DatabaseService {
     }
   }
 
-  async addAlbum(title: string, description: string): Promise<Album> {
+  async getPrivatePhotoIds(userSession: any): Promise<Set<string>> {
+    const privateSet = new Set<string>();
+    if (userSession) return privateSet;
+
+    try {
+      const albums = await this.getAlbums();
+      const privateAlbums = albums.filter(album => album.is_public === false || album.description?.startsWith('[PRIVATE_ALBUM]'));
+      const publicAlbums = albums.filter(album => album.is_public !== false && !album.description?.startsWith('[PRIVATE_ALBUM]'));
+
+      let albumPhotosMap: Record<string, string[]> = {};
+      if (this.isUsingSupabase) {
+        const { data, error } = await this.supabase.from('album_photos').select('*');
+        if (!error && data) {
+          data.forEach((row: any) => {
+            if (!albumPhotosMap[row.album_id]) albumPhotosMap[row.album_id] = [];
+            albumPhotosMap[row.album_id].push(row.photo_id);
+          });
+        }
+      } else {
+        const raw = localStorage.getItem('kronika_album_photos');
+        if (raw) albumPhotosMap = JSON.parse(raw);
+      }
+
+      const privatePhotoIds = new Set<string>();
+      privateAlbums.forEach(album => {
+        const pIds = albumPhotosMap[album.id] || [];
+        pIds.forEach(id => privatePhotoIds.add(id));
+      });
+
+      const publicPhotoIds = new Set<string>();
+      publicAlbums.forEach(album => {
+        const pIds = albumPhotosMap[album.id] || [];
+        pIds.forEach(id => publicPhotoIds.add(id));
+      });
+
+      privatePhotoIds.forEach(id => {
+        if (!publicPhotoIds.has(id)) {
+          privateSet.add(id);
+        }
+      });
+    } catch (e) {
+      console.error('Chyba pri zisťovaní súkromných fotiek:', e);
+    }
+
+    return privateSet;
+  }
+
+  async addAlbum(title: string, description: string, isPublic: boolean = true): Promise<Album> {
     const newId = 'a_' + Math.random().toString(36).substr(2, 9);
     const newAlbum: Album = {
       id: newId,
       title,
-      description,
-      created_at: new Date().toISOString()
+      description: isPublic ? description : '[PRIVATE_ALBUM]' + description,
+      created_at: new Date().toISOString(),
+      is_public: isPublic
     };
 
     if (this.isUsingSupabase) {
-      const { data, error } = await this.supabase
-        .from('albums')
-        .insert([newAlbum])
-        .select();
-      if (error) throw error;
-      return data[0] as Album;
+      try {
+        const { data, error } = await this.supabase
+          .from('albums')
+          .insert([newAlbum])
+          .select();
+        if (error) throw error;
+        return data[0] as Album;
+      } catch (err) {
+        console.warn('Nepodarilo sa vložiť is_public stĺpec do Supabase. Skúšam fallback...', err);
+        const { is_public, ...omittedAlbum } = newAlbum;
+        const { data, error } = await this.supabase
+          .from('albums')
+          .insert([omittedAlbum])
+          .select();
+        if (error) throw error;
+        return { ...data[0], is_public: isPublic } as Album;
+      }
     } else {
       const albums = await this.getAlbums();
       albums.push(newAlbum);

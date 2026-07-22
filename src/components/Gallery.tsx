@@ -342,7 +342,11 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
   const loadData = async () => {
     try {
       setLoading(true);
-      const photosList = await db.getPhotos();
+      let photosList = await db.getPhotos();
+      const privatePhotoIds = await db.getPrivatePhotoIds(userSession);
+      if (privatePhotoIds.size > 0) {
+        photosList = photosList.filter(p => !privatePhotoIds.has(p.id));
+      }
       const peopleList = await db.getPeople();
       setPhotos(photosList);
       setPeople(peopleList);
