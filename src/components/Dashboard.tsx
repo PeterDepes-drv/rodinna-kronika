@@ -19,6 +19,11 @@ interface BirthdayItem {
   birthDate: string;
 }
 
+const monthsNames = [
+  'Január', 'Február', 'Marec', 'Apríl', 'Máj', 'Jún',
+  'Júl', 'August', 'September', 'Október', 'November', 'December'
+];
+
 interface AnniversaryItem {
   photo: Photo;
   yearsAgo: number;
@@ -32,6 +37,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onSelectPhoto,
   const [recentPhotos, setRecentPhotos] = useState<Photo[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
+  const [allPhotos, setAllPhotos] = useState<Photo[]>([]);
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
 
   // Stavy pre kalendár a výročia
   const [upcomingBirthdays, setUpcomingBirthdays] = useState<BirthdayItem[]>([]);
@@ -88,11 +95,40 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onSelectPhoto,
     return null;
   };
 
+  const getMonthMemories = () => {
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const grouped: Record<number, Photo[]> = {};
+
+    allPhotos.forEach(photo => {
+      const parsed = parsePhotoDate(photo.taken_at);
+      if (!parsed) return;
+
+      if (parsed.month === selectedMonth) {
+        const yearsAgo = currentYear - parsed.year;
+        if (yearsAgo > 0) {
+          if (!grouped[yearsAgo]) {
+            grouped[yearsAgo] = [];
+          }
+          grouped[yearsAgo].push(photo);
+        }
+      }
+    });
+
+    return grouped;
+  };
+
   useEffect(() => {
     const loadDashboardData = async () => {
       try {
         setLoading(true);
-        const photosList = await db.getPhotos();
+        const rawPhotos = await db.getPhotos();
+        const privatePhotoIds = await db.getPrivatePhotoIds(userSession);
+        const photosList = privatePhotoIds.size > 0 
+          ? rawPhotos.filter(p => !privatePhotoIds.has(p.id))
+          : rawPhotos;
+
+        setAllPhotos(photosList);
         const peopleList = await db.getPeople();
         const albumsList = await db.getAlbums();
 
@@ -398,6 +434,108 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onSelectPhoto,
             <div className="stat-label">Tematických albumov</div>
           </div>
         </div>
+      </div>
+
+      {/* PANEL: Kalendár rodinných výročí (Ročný súhrn) */}
+      <div className="panel" style={{ marginTop: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <h2 className="panel-title" style={{ color: '#c084fc', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Calendar size={22} /> Kalendár rodinných výročí (V tento mesiac)
+          </h2>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+            Čo sa udialo v našej rodine v mesiaci: <strong>{monthsNames[selectedMonth]}</strong>
+          </span>
+        </div>
+
+        {/* Mesiačné tlačidlá prepínača */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1.5rem' }}>
+          {monthsNames.map((name, idx) => {
+            const isSelected = selectedMonth === idx;
+            const isCurrent = new Date().getMonth() === idx;
+            return (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => setSelectedMonth(idx)}
+                className="btn"
+                style={{
+                  padding: '0.4rem 0.8rem',
+                  fontSize: '0.8rem',
+                  borderRadius: '20px',
+                  background: isSelected 
+                    ? 'linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%)' 
+                    : 'rgba(255, 255, 255, 0.04)',
+                  borderColor: isSelected 
+                    ? 'transparent' 
+                    : isCurrent 
+                      ? 'rgba(167, 139, 250, 0.4)' 
+                      : 'rgba(255, 255, 255, 0.08)',
+                  color: isSelected ? 'white' : 'var(--text-secondary)',
+                  boxShadow: isSelected ? '0 0 10px rgba(167, 139, 250, 0.3)' : 'none',
+                  cursor: 'pointer',
+                  fontWeight: isSelected || isCurrent ? 700 : 500,
+                  transition: 'all 0.2s ease',
+                  outline: 'none'
+                }}
+              >
+                {name.substring(0, 3)}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Zoznam spomienok z daného mesiaca */}
+        {(() => {
+          const memoriesGrouped = getMonthMemories();
+          const years = Object.keys(memoriesGrouped).map(Number).sort((a, b) => b - a);
+
+          if (years.length === 0) {
+            return (
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', fontStyle: 'italic', padding: '1.5rem 0', textAlign: 'center', width: '100%' }}>
+                V mesiaci {monthsNames[selectedMonth]} zatiaľ nemáme zaznamenané žiadne rodinné spomienky predchádzajúcich rokov.
+              </p>
+            );
+          }
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {years.map(yearsAgo => {
+                const year = new Date().getFullYear() - yearsAgo;
+                const photos = memoriesGrouped[yearsAgo];
+                return (
+                  <div key={yearsAgo} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', paddingBottom: '1.25rem' }}>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#a78bfa', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.75rem' }}>
+                      <Clock size={14} /> Pred {yearsAgo} {yearsAgo === 1 ? 'rokom' : (yearsAgo >= 2 && yearsAgo <= 4) ? 'rokmi' : 'rokmi'} ({monthsNames[selectedMonth]} {year})
+                    </div>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '1rem' }}>
+                      {photos.map(photo => (
+                        <div 
+                          key={photo.id} 
+                          className="photo-card" 
+                          style={{ cursor: 'pointer', margin: 0 }}
+                          onClick={() => onSelectPhoto(photo)}
+                        >
+                          <div className="photo-wrapper" style={{ aspectRatio: '1.4' }}>
+                            <img src={photo.storage_path} alt={photo.title} className="photo-img" />
+                          </div>
+                          <div className="photo-card-info" style={{ padding: '0.5rem' }}>
+                            <h4 style={{ fontSize: '0.8rem', fontWeight: 600, color: 'white', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {photo.title}
+                            </h4>
+                            <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', margin: '0.15rem 0 0 0' }}>
+                              {photo.taken_at} {photo.location ? `• ${photo.location}` : ''}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Rodinné pripomienky a historické výročia */}
