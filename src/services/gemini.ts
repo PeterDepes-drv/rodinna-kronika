@@ -189,3 +189,110 @@ export async function transcribeAudio(base64Audio: string, mimeType: string = 'a
     throw new Error('Prepis zvuku zlyhal: ' + (error as Error).message);
   }
 }
+
+export async function semanticSearchPhotos(
+  query: string,
+  photosMetadata: Array<{
+    id: string;
+    title: string;
+    description: string;
+    location: string;
+    taken_at: string;
+    people: string[];
+    tags: string[];
+    detected_text?: string;
+  }>
+): Promise<string[]> {
+  let apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
+  const storedConfig = localStorage.getItem('gemini_config');
+  if (storedConfig) {
+    try {
+      const parsed = JSON.parse(storedConfig);
+      if (parsed.apiKey) {
+        apiKey = parsed.apiKey;
+      }
+    } catch (e) {
+      console.error('Chyba pri načítaní Gemini kľúča z localStorage', e);
+    }
+  }
+
+  if (!apiKey) {
+    console.log('Gemini API kľúč nie je nastavený. Beží simulované sémantické vyhľadávanie.');
+    const queryLower = query.toLowerCase();
+    const matches = photosMetadata.filter(p => {
+      const titleMatch = p.title.toLowerCase().includes(queryLower);
+      const descMatch = p.description.toLowerCase().includes(queryLower);
+      const locMatch = p.location.toLowerCase().includes(queryLower);
+      const peopleMatch = p.people.some(name => name.toLowerCase().includes(queryLower));
+      const tagsMatch = p.tags.some(tag => tag.toLowerCase().includes(queryLower));
+      
+      const isSummerQuery = queryLower.includes('leto') || queryLower.includes('letn');
+      const isSummerPhoto = isSummerQuery && (p.taken_at.includes('-06-') || p.taken_at.includes('-07-') || p.taken_at.includes('-08-') || p.tags.includes('leto') || p.description.toLowerCase().includes('leto'));
+      
+      const isWinterQuery = queryLower.includes('zima') || queryLower.includes('zimn');
+      const isWinterPhoto = isWinterQuery && (p.taken_at.includes('-12-') || p.taken_at.includes('-01-') || p.taken_at.includes('-02-') || p.tags.includes('zima') || p.description.toLowerCase().includes('zima'));
+
+      const isOldQuery = queryLower.includes('star') || queryLower.includes('histor');
+      const isOldPhoto = isOldQuery && (p.taken_at.startsWith('19') && parseInt(p.taken_at.substring(0, 4)) < 1980);
+
+      return titleMatch || descMatch || locMatch || peopleMatch || tagsMatch || isSummerPhoto || isWinterPhoto || isOldPhoto;
+    });
+
+    return matches.map(m => m.id);
+  }
+
+  try {
+    const model = 'gemini-2.5-flash';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    const prompt = `Si inteligentný vyhľadávací asistent pre rodinnú kroniku. Používateľ hľadá spomienku pomocou dopytu: "${query}"
+
+Máš k dispozícii nasledujúci zoznam fotografií s ich metadátami:
+${JSON.stringify(photosMetadata, null, 2)}
+
+Úloha:
+1. Analyzuj každú fotografiu a urči, či sémanticky zodpovedá dopytu. 
+2. Premýšľaj sémanticky v kontexte rodiny a slovenského jazyka:
+   - "dedko" alebo "starý otec" zodpovedá starším mužom, alebo ak je v popise spomenuté "starý otec" / "dedko".
+   - "leto", "na pláži", "pri vode" sa spája s letnými mesiacmi (jún, júl, august) alebo letnými tagmi.
+   - "zima", "na lyžiach", "sneh" sa spája so zimnými mesiacmi (december, január, február) alebo zimnými športmi.
+   - "svadba" sa spája so sobášom, svadobnými šatami, kyticami.
+3. Zorad zodpovedajúce fotografie od najrelevantnejšej po najmenej relevantnú. 
+
+Výstup MUSÍ byť vo formáte JSON s poľom ID nájdených fotografií:
+["id1", "id2", "id3", ...]
+
+Vráť iba čisté JSON pole bez okolitého textu alebo markdown značiek (nepoužívaj \`\`\`json).`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [{ text: prompt }]
+          }
+        ],
+        generationConfig: {
+          responseMimeType: 'application/json'
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errData = await response.json();
+      throw new Error(errData.error?.message || 'Zlyhalo volanie Gemini API pri sémantickom vyhľadávaní');
+    }
+
+    const resData = await response.json();
+    const responseText = resData.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+    const cleanText = responseText.trim().replace(/^```json/, '').replace(/```$/, '').trim();
+    const result = JSON.parse(cleanText) as string[];
+    return result;
+  } catch (error) {
+    console.error('Chyba pri sémantickom vyhľadávaní:', error);
+    return [];
+  }
+}

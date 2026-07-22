@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../services/db';
 import type { Photo, Person, AIAnalysisResult, PhotoComment } from '../services/db';
-import { analyzePhoto, fileToBase64, transcribeAudio } from '../services/gemini';
+import { analyzePhoto, fileToBase64, transcribeAudio, semanticSearchPhotos } from '../services/gemini';
 import { Search, Plus, Calendar, MapPin, Users, Trash2, Edit, X, Brain, AlertCircle, Maximize2, Link, MessageSquare, Mic, Square, RefreshCw, Check } from 'lucide-react';
 
 interface GalleryProps {
@@ -122,6 +122,11 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
   const [selectedPersonIds, setSelectedPersonIds] = useState<string[]>([]);
   const [matchAllPeople, setMatchAllPeople] = useState(false);
   const [selectedTag, setSelectedTag] = useState<string>('all');
+  
+  // Sémantické AI vyhľadávanie
+  const [isAISearch, setIsAISearch] = useState(false);
+  const [aiSearchLoading, setAiSearchLoading] = useState(false);
+  const [aiSearchResultIds, setAiSearchResultIds] = useState<string[] | null>(null);
 
   // Modály
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -361,6 +366,45 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
     loadData();
   }, []);
 
+  const handleAISearch = async () => {
+    if (!searchQuery.trim()) {
+      setAiSearchResultIds(null);
+      return;
+    }
+
+    try {
+      setAiSearchLoading(true);
+      
+      const metadata = photos.map(photo => ({
+        id: photo.id,
+        title: photo.title,
+        description: photo.description || '',
+        location: photo.location || '',
+        taken_at: photo.taken_at || '',
+        people: (photo.people || []).map(pid => {
+          const p = people.find(pers => pers.id === pid);
+          return p ? p.name : '';
+        }).filter(Boolean),
+        tags: photo.ai_metadata?.tags || [],
+        detected_text: photo.ai_metadata?.detected_text || ''
+      }));
+
+      const matchingIds = await semanticSearchPhotos(searchQuery, metadata);
+      setAiSearchResultIds(matchingIds);
+    } catch (e) {
+      console.error('Sémantické vyhľadávanie zlyhalo:', e);
+      alert('Nepodarilo sa vykonať inteligentné vyhľadávanie.');
+    } finally {
+      setAiSearchLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isAISearch || !searchQuery.trim()) {
+      setAiSearchResultIds(null);
+    }
+  }, [searchQuery, isAISearch]);
+
   // Extrahuje všetky unikátne tagy z fotiek pre filter
   const getAllTags = () => {
     const tagsSet = new Set<string>();
@@ -373,36 +417,50 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
   };
 
   // Filtrácia fotiek
-  const filteredPhotos = photos.filter(photo => {
-    // Search filter (title, description, location, tags, person name)
-    const query = searchQuery.toLowerCase();
-    const matchesSearch = 
-      photo.title.toLowerCase().includes(query) ||
-      photo.description.toLowerCase().includes(query) ||
-      photo.location.toLowerCase().includes(query) ||
-      (photo.ai_metadata?.tags && photo.ai_metadata.tags.some(t => t.toLowerCase().includes(query))) ||
-      (photo.people && photo.people.some(pid => {
-        const p = people.find(person => person.id === pid);
-        return p ? p.name.toLowerCase().includes(query) : false;
-      }));
+  const getFilteredPhotos = () => {
+    let basePhotos = photos;
+    
+    if (isAISearch && aiSearchResultIds !== null) {
+      basePhotos = aiSearchResultIds
+        .map(id => photos.find(p => p.id === id))
+        .filter((p): p is Photo => !!p);
+    }
 
-    // Decade filter
-    const matchesDecade = selectedDecade === 'all' || photo.decade.toString() === selectedDecade;
+    return basePhotos.filter(photo => {
+      let matchesSearch = true;
+      if (!isAISearch && searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        matchesSearch = 
+          photo.title.toLowerCase().includes(query) ||
+          photo.description.toLowerCase().includes(query) ||
+          photo.location.toLowerCase().includes(query) ||
+          !!(photo.ai_metadata?.tags && photo.ai_metadata.tags.some(t => t.toLowerCase().includes(query))) ||
+          !!(photo.people && photo.people.some(pid => {
+            const p = people.find(person => person.id === pid);
+            return p ? p.name.toLowerCase().includes(query) : false;
+          }));
+      }
 
-    // Person filter
-    const matchesPerson = 
-      selectedPersonIds.length === 0 || 
-      (photo.people && (
-        matchAllPeople
-          ? selectedPersonIds.every(pid => photo.people?.includes(pid))
-          : selectedPersonIds.some(pid => photo.people?.includes(pid))
-      ));
+      // Decade filter
+      const matchesDecade = selectedDecade === 'all' || photo.decade.toString() === selectedDecade;
 
-    // Tag filter
-    const matchesTag = selectedTag === 'all' || (photo.ai_metadata?.tags && photo.ai_metadata.tags.includes(selectedTag));
+      // Person filter
+      const matchesPerson = 
+        selectedPersonIds.length === 0 || 
+        (photo.people && (
+          matchAllPeople
+            ? selectedPersonIds.every(pid => photo.people?.includes(pid))
+            : selectedPersonIds.some(pid => photo.people?.includes(pid))
+        ));
 
-    return matchesSearch && matchesDecade && matchesPerson && matchesTag;
-  });
+      // Tag filter
+      const matchesTag = selectedTag === 'all' || (photo.ai_metadata?.tags && photo.ai_metadata.tags.includes(selectedTag));
+
+      return matchesSearch && matchesDecade && matchesPerson && matchesTag;
+    });
+  };
+
+  const filteredPhotos = getFilteredPhotos();
 
   const handleOpenAddModal = () => {
     setFormData({
@@ -742,15 +800,67 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
 
       {/* Riadok s filtrami */}
       <div className="filter-bar">
-        <div className="search-input-wrapper">
-          <Search size={18} />
-          <input 
-            type="text" 
-            placeholder="Vyhľadajte spomienku, osobu, tag alebo miesto..." 
-            className="input-field"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%', maxWidth: '400px' }}>
+          <div className="search-input-wrapper" style={{ position: 'relative', width: '100%' }}>
+            <Search size={18} />
+            <input 
+              type="text" 
+              placeholder={isAISearch ? "Hľadajte sémanticky (napr. 'dedko v lete')..." : "Vyhľadajte spomienku, osobu, tag alebo miesto..."} 
+              className="input-field"
+              style={{ paddingRight: isAISearch && searchQuery.trim() ? '5.5rem' : '1.5rem' }}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && isAISearch) {
+                  handleAISearch();
+                }
+              }}
+            />
+            {isAISearch && searchQuery.trim() && (
+              <button 
+                type="button" 
+                onClick={handleAISearch} 
+                disabled={aiSearchLoading}
+                className="btn btn-primary"
+                style={{ 
+                  position: 'absolute', 
+                  right: '0.25rem', 
+                  top: '0.25rem', 
+                  bottom: '0.25rem', 
+                  fontSize: '0.75rem', 
+                  padding: '0 0.75rem', 
+                  height: 'auto', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '0.25rem',
+                  borderRadius: '6px'
+                }}
+              >
+                <Brain size={12} /> {aiSearchLoading ? 'Hľadám...' : 'Hľadať'}
+              </button>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsAISearch(!isAISearch)}
+            className="btn"
+            style={{
+              fontSize: '0.75rem',
+              padding: '0.25rem 0.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.25rem',
+              alignSelf: 'flex-start',
+              background: isAISearch ? 'linear-gradient(135deg, rgba(167, 139, 250, 0.15) 0%, rgba(124, 58, 237, 0.15) 100%)' : 'rgba(255, 255, 255, 0.03)',
+              borderColor: isAISearch ? 'var(--accent)' : 'rgba(255,255,255,0.08)',
+              color: isAISearch ? '#c084fc' : 'var(--text-secondary)',
+              fontWeight: 600,
+              borderRadius: '6px',
+              cursor: 'pointer'
+            }}
+          >
+            <Brain size={12} /> ✨ Inteligentné AI vyhľadávanie: {isAISearch ? 'ZAPNUTÉ' : 'VYPNUTÉ'}
+          </button>
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
