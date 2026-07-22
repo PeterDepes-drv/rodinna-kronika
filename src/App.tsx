@@ -18,7 +18,9 @@ import {
   LogOut,
   Maximize2,
   Minimize2,
-  Map
+  Map,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { Gallery } from './components/Gallery';
@@ -33,6 +35,101 @@ import type { Photo } from './services/db';
 import { authService } from './services/auth';
 import type { UserSession } from './services/auth';
 import { AuthModal } from './components/AuthModal';
+
+class AmbientMusicPlayer {
+  private audioCtx: AudioContext | null = null;
+  private isPlaying = false;
+  private timer: any = null;
+
+  public start() {
+    if (this.isPlaying) return;
+    this.isPlaying = true;
+    
+    const AudioContextClass = (window.AudioContext || (window as any).webkitAudioContext);
+    this.audioCtx = new AudioContextClass();
+    
+    const playNote = (frequency: number, startTime: number, duration: number) => {
+      if (!this.audioCtx) return;
+      
+      const osc = this.audioCtx.createOscillator();
+      const gainNode = this.audioCtx.createGain();
+      
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(frequency, startTime);
+      
+      const filter = this.audioCtx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(800, startTime);
+      
+      gainNode.gain.setValueAtTime(0, startTime);
+      gainNode.gain.linearRampToValueAtTime(0.08, startTime + 0.5); // Very soft background level
+      gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+      
+      osc.connect(filter);
+      filter.connect(gainNode);
+      gainNode.connect(this.audioCtx.destination);
+      
+      osc.start(startTime);
+      osc.stop(startTime + duration);
+    };
+
+    const notes = [
+      130.81, 146.83, 164.81, 196.00, 220.00,
+      261.63, 293.66, 329.63, 392.00, 440.00,
+      523.25, 587.33, 659.25, 783.99, 880.00
+    ];
+
+    const playDrone = () => {
+      if (!this.isPlaying || !this.audioCtx) return;
+      const now = this.audioCtx.currentTime;
+      const rootNotes = [130.81, 164.81, 196.00]; // C
+      const AmChord = [110.00, 130.81, 164.81]; // Am
+      const FChord = [87.31, 130.81, 174.61]; // F
+      const GChord = [98.00, 146.83, 196.00]; // G
+      const chords = [rootNotes, AmChord, FChord, GChord];
+      const selectedChord = chords[Math.floor(Math.random() * chords.length)];
+
+      selectedChord.forEach(freq => {
+        playNote(freq, now, 8);
+      });
+    };
+
+    const tick = () => {
+      if (!this.isPlaying || !this.audioCtx) return;
+      const now = this.audioCtx.currentTime;
+      
+      if (Math.random() < 0.65) {
+        const melodyNotes = notes.slice(5);
+        const freq = melodyNotes[Math.floor(Math.random() * melodyNotes.length)];
+        const delay = Math.random() * 2;
+        const duration = 3 + Math.random() * 4;
+        playNote(freq, now + delay, duration);
+      }
+      
+      const nextTick = 3000 + Math.random() * 2000;
+      this.timer = setTimeout(tick, nextTick);
+    };
+
+    playDrone();
+    const droneInterval = setInterval(() => {
+      if (this.isPlaying) playDrone();
+      else clearInterval(droneInterval);
+    }, 8000);
+
+    tick();
+  }
+
+  public stop() {
+    this.isPlaying = false;
+    if (this.timer) clearTimeout(this.timer);
+    if (this.audioCtx) {
+      this.audioCtx.close();
+      this.audioCtx = null;
+    }
+  }
+}
+
+let ambientPlayer: AmbientMusicPlayer | null = null;
 
 function App() {
   const [activeView, setActiveView] = useState<string>('dashboard');
@@ -75,6 +172,7 @@ function App() {
   const [slideshowTitle, setSlideshowTitle] = useState('');
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [isSlideshowPlaying, setIsSlideshowPlaying] = useState(false);
+  const [musicEnabled, setMusicEnabled] = useState(true);
 
   // Automatické prepínanie slajdov v prezentácii
   useEffect(() => {
@@ -107,6 +205,13 @@ function App() {
     setCurrentSlideIndex(0);
     setIsSlideshowPlaying(true);
 
+    if (musicEnabled) {
+      if (!ambientPlayer) {
+        ambientPlayer = new AmbientMusicPlayer();
+      }
+      ambientPlayer.start();
+    }
+
     // Prechod na celú obrazovku
     if (document.documentElement.requestFullscreen) {
       document.documentElement.requestFullscreen().catch(() => {});
@@ -116,8 +221,31 @@ function App() {
   const handleCloseSlideshow = () => {
     setSlideshowPhotos([]);
     setIsSlideshowPlaying(false);
+    
+    if (ambientPlayer) {
+      ambientPlayer.stop();
+      ambientPlayer = null;
+    }
+
     if (document.fullscreenElement && document.exitFullscreen) {
       document.exitFullscreen().catch(() => {});
+    }
+  };
+
+  const handleToggleMusic = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (musicEnabled) {
+      setMusicEnabled(false);
+      if (ambientPlayer) {
+        ambientPlayer.stop();
+        ambientPlayer = null;
+      }
+    } else {
+      setMusicEnabled(true);
+      if (!ambientPlayer) {
+        ambientPlayer = new AmbientMusicPlayer();
+      }
+      ambientPlayer.start();
     }
   };
 
@@ -330,6 +458,25 @@ function App() {
               </p>
             </div>
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <button 
+                className="btn-icon" 
+                style={{ 
+                  backgroundColor: musicEnabled ? 'rgba(167, 139, 250, 0.2)' : 'rgba(255,255,255,0.05)', 
+                  color: musicEnabled ? '#c084fc' : 'white', 
+                  border: musicEnabled ? '1px solid rgba(167, 139, 250, 0.4)' : 'none', 
+                  borderRadius: '50%', 
+                  width: '40px', 
+                  height: '40px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  cursor: 'pointer' 
+                }}
+                onClick={handleToggleMusic}
+                title={musicEnabled ? 'Stíšiť hudbu pozadia' : 'Zapnúť hudbu pozadia'}
+              >
+                {musicEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+              </button>
               <button 
                 className="btn-icon" 
                 style={{ backgroundColor: 'rgba(255,255,255,0.05)', color: 'white', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
