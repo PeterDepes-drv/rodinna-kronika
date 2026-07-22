@@ -17,7 +17,8 @@ import {
   LogIn,
   LogOut,
   Maximize2,
-  Minimize2
+  Minimize2,
+  Map
 } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { Gallery } from './components/Gallery';
@@ -26,6 +27,7 @@ import { People } from './components/People';
 import { Presentations } from './components/Presentations';
 import { ImportPhotos } from './components/ImportPhotos';
 import { Settings } from './components/Settings';
+import { MapMemories } from './components/MapMemories';
 import type { Photo } from './services/db';
 import { authService } from './services/auth';
 import type { UserSession } from './services/auth';
@@ -146,6 +148,8 @@ function App() {
         );
       case 'timeline':
         return <Timeline onSelectPhoto={handleSelectPhoto} />;
+      case 'map':
+        return <MapMemories onSelectPhoto={handleSelectPhoto} />;
       case 'people':
         return <People onSelectPhoto={handleSelectPhoto} userSession={userSession} />;
       case 'presentations':
@@ -200,6 +204,13 @@ function App() {
               <button onClick={() => setActiveView('timeline')}>
                 <Clock size={18} />
                 <span>Časová os</span>
+              </button>
+            </li>
+
+            <li className={`menu-item ${activeView === 'map' ? 'active' : ''}`}>
+              <button onClick={() => setActiveView('map')}>
+                <Map size={18} />
+                <span>Mapa spomienok</span>
               </button>
             </li>
 
