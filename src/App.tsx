@@ -157,6 +157,7 @@ function App() {
             onNavigate={setActiveView} 
             onSelectPhoto={handleSelectPhoto}
             onStartSlideshow={handleStartSlideshow}
+            userSession={userSession}
           />
         );
       case 'gallery':
@@ -192,6 +193,7 @@ function App() {
             onNavigate={setActiveView} 
             onSelectPhoto={handleSelectPhoto}
             onStartSlideshow={handleStartSlideshow}
+            userSession={userSession}
           />
         );
     }

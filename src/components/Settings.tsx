@@ -17,6 +17,11 @@ export const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
   const [geminiKey, setGeminiKey] = useState('');
   const [googleClientId, setGoogleClientId] = useState('');
 
+  // Nastavenia pre rodinné výzvy (Fotka týždňa)
+  const [emailsList, setEmailsList] = useState('');
+  const [resendApiKey, setResendApiKey] = useState('');
+  const [resendSender, setResendSender] = useState('');
+
   // Info správy
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
 
@@ -42,6 +47,11 @@ export const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
     }
 
     setGoogleClientId(googlePhotos.getClientId());
+
+    // E-maily
+    setEmailsList(localStorage.getItem('kronika_settings_emails') || '');
+    setResendApiKey(localStorage.getItem('kronika_settings_resend_api_key') || '');
+    setResendSender(localStorage.getItem('kronika_settings_resend_sender') || 'onboarding@resend.dev');
   }, []);
 
   const handleSaveConfigs = (e: React.FormEvent) => {
@@ -75,11 +85,28 @@ export const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
         googlePhotos.setClientId('');
       }
 
+      // 4. Resend / Fotka týždňa
+      if (emailsList.trim()) {
+        localStorage.setItem('kronika_settings_emails', emailsList.trim());
+      } else {
+        localStorage.removeItem('kronika_settings_emails');
+      }
+      if (resendApiKey.trim()) {
+        localStorage.setItem('kronika_settings_resend_api_key', resendApiKey.trim());
+      } else {
+        localStorage.removeItem('kronika_settings_resend_api_key');
+      }
+      if (resendSender.trim()) {
+        localStorage.setItem('kronika_settings_resend_sender', resendSender.trim());
+      } else {
+        localStorage.removeItem('kronika_settings_resend_sender');
+      }
+
       // Re-inicializácia DB klienta
       db.initClient();
       setDbStatus(db.getStatus());
 
-      setSaveStatus('Nastavenia boli úspešne uložené a pripojenia re-štartované!');
+      setSaveStatus('Nastavenia boli úspešne uložené!');
       setTimeout(() => setSaveStatus(null), 3000);
     } catch (e) {
       console.error(e);
@@ -246,6 +273,57 @@ export const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
               value={googleClientId}
               onChange={(e) => setGoogleClientId(e.target.value)}
             />
+          </div>
+        </div>
+
+        {/* Nastavenia E-mailových výziev */}
+        <div className="panel flex" style={{ flexDirection: 'column' }}>
+          <h2 className="panel-title" style={{ marginBottom: '1.25rem', color: '#38bdf8' }}>
+            <Info size={20} /> 4. Rodinné výzvy ("Fotka týždňa")
+          </h2>
+          <p style={{ fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+            Nastavte zoznam e-mailov rodinných príslušníkov, ktorým chcete posielať náhodné staré fotky s výzvou na doplnenie chýbajúcich príbehov.
+          </p>
+
+          <div className="form-group">
+            <label>E-maily príjemcov (oddelené čiarkou)</label>
+            <input 
+              type="text" 
+              className="input-field" 
+              style={{ paddingLeft: '1rem' }}
+              placeholder="mama@email.cz, otec@email.cz, dedko@email.cz"
+              value={emailsList}
+              onChange={(e) => setEmailsList(e.target.value)}
+            />
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Resend API Kľúč (Nepovinné - pre automatické posielanie)</label>
+              <input 
+                type="password" 
+                className="input-field" 
+                style={{ paddingLeft: '1rem' }}
+                placeholder="re_xxxxxxxx"
+                value={resendApiKey}
+                onChange={(e) => setResendApiKey(e.target.value)}
+              />
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem', display: 'block' }}>
+                Získate zadarmo na <a href="https://resend.com" target="_blank" rel="noreferrer" style={{ color: '#38bdf8' }}>resend.com</a> pre posielanie priamo z prehliadača.
+              </span>
+            </div>
+
+            <div className="form-group">
+              <label>Odosielateľ e-mailu (iba ak máte Resend kľúč)</label>
+              <input 
+                type="text" 
+                className="input-field" 
+                style={{ paddingLeft: '1rem' }}
+                placeholder="onboarding@resend.dev"
+                value={resendSender}
+                onChange={(e) => setResendSender(e.target.value)}
+              />
+            </div>
           </div>
         </div>
 

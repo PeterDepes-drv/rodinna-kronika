@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { db } from '../services/db';
 import type { Photo, Person } from '../services/db';
-import { Image, Users, BookOpen, Calendar, MapPin, Play, Gift, Sparkles, Clock } from 'lucide-react';
+import { Image, Users, BookOpen, Calendar, MapPin, Play, Gift, Sparkles, Clock, RotateCw, Mail, MessageSquare } from 'lucide-react';
 
 interface DashboardProps {
   onNavigate: (view: string) => void;
   onSelectPhoto: (photo: Photo) => void;
   onStartSlideshow: (photos: Photo[], title: string) => void;
+  userSession?: any;
 }
 
 interface BirthdayItem {
@@ -25,7 +26,7 @@ interface AnniversaryItem {
   isToday: boolean;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onSelectPhoto, onStartSlideshow }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onSelectPhoto, onStartSlideshow, userSession }) => {
   const [stats, setStats] = useState({ photos: 0, people: 0, albums: 0 });
   const [randomMemory, setRandomMemory] = useState<Photo | null>(null);
   const [recentPhotos, setRecentPhotos] = useState<Photo[]>([]);
@@ -35,6 +36,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onSelectPhoto,
   // Stavy pre kalendár a výročia
   const [upcomingBirthdays, setUpcomingBirthdays] = useState<BirthdayItem[]>([]);
   const [anniversaries, setAnniversaries] = useState<AnniversaryItem[]>([]);
+
+  // Stav pre výzvu (Fotka týždňa)
+  const [challengePhoto, setChallengePhoto] = useState<Photo | null>(null);
+  const [sendingStatus, setSendingStatus] = useState<string | null>(null);
 
   const parseBirthDate = (dateStr?: string) => {
     if (!dateStr) return null;
@@ -195,6 +200,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onSelectPhoto,
 
         setAnniversaries(annivs);
 
+        // Výber fotky pre výzvu (Fotka týždňa)
+        if (photosList.length > 0) {
+          let candidates = photosList.filter(p => !p.description || p.description.trim().length < 10 || !p.people || p.people.length === 0);
+          if (candidates.length === 0) {
+            candidates = photosList;
+          }
+          candidates.sort((a, b) => a.decade - b.decade);
+          const sliceSize = Math.max(1, Math.floor(candidates.length / 2));
+          const oldestHalf = candidates.slice(0, sliceSize);
+          const randomIndex = Math.floor(Math.random() * oldestHalf.length);
+          setChallengePhoto(oldestHalf[randomIndex]);
+        }
+
       } catch (e) {
         console.error('Chyba pri načítaní dát pre nástenku:', e);
       } finally {
@@ -204,6 +222,118 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onSelectPhoto,
 
     loadDashboardData();
   }, []);
+
+  const handleRotateChallenge = async () => {
+    try {
+      const photosList = await db.getPhotos();
+      if (photosList.length === 0) return;
+      
+      let candidates = photosList.filter(p => !p.description || p.description.trim().length < 10 || !p.people || p.people.length === 0);
+      if (candidates.length === 0) {
+        candidates = photosList;
+      }
+      candidates.sort((a, b) => a.decade - b.decade);
+      const sliceSize = Math.max(1, Math.floor(candidates.length / 2));
+      const oldestHalf = candidates.slice(0, sliceSize);
+      
+      const filtered = oldestHalf.filter(p => p.id !== challengePhoto?.id);
+      const pool = filtered.length > 0 ? filtered : oldestHalf;
+      
+      const randomIndex = Math.floor(Math.random() * pool.length);
+      setChallengePhoto(pool[randomIndex]);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleSendEmail = () => {
+    if (!challengePhoto) return;
+    const emailsList = localStorage.getItem('kronika_settings_emails') || '';
+    const resendApiKey = localStorage.getItem('kronika_settings_resend_api_key') || '';
+    const resendSender = localStorage.getItem('kronika_settings_resend_sender') || 'onboarding@resend.dev';
+
+    const deepLink = window.location.origin + window.location.pathname + '?photo=' + challengePhoto.id;
+    
+    const subject = encodeURIComponent(`Rodinná výzva: Spoznávate túto spomienku? (${challengePhoto.title})`);
+    const body = encodeURIComponent(
+      `Ahoj rodina!\n\n` +
+      `Pomôžte nám doplniť príbeh a históriu v našej rodinnej kronike. Spoznávate túto fotografiu?\n\n` +
+      `Názov: ${challengePhoto.title}\n` +
+      `Kedy vznikla: ${challengePhoto.taken_at || 'Neznámy dátum'}\n` +
+      `Kde to bolo: ${challengePhoto.location || 'Neznáme miesto'}\n\n` +
+      `Ak viete, kto je na fotke alebo čo sa vtedy dialo, doplňte to priamo tu kliknutím na odkaz:\n` +
+      `${deepLink}\n\n` +
+      `S láskou,\n` +
+      `Vaša rodinná kronika`
+    );
+
+    if (resendApiKey && emailsList) {
+      setSendingStatus('Odosielam e-mail...');
+      const recipients = emailsList.split(',').map(e => e.trim());
+      
+      fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        mode: 'cors',
+        body: JSON.stringify({
+          from: resendSender,
+          to: recipients,
+          subject: `Rodinná výzva: ${challengePhoto.title}`,
+          html: `
+            <div style="font-family: sans-serif; padding: 20px; max-width: 600px; border: 1px solid #e2e8f0; border-radius: 8px; background: #0f172a; color: #f8fafc;">
+              <h2 style="color: #c084fc;">Ahoj rodina!</h2>
+              <p>Pomôžte nám doplniť príbeh a označiť ľudí na tejto fotografii v našej rodinnej kronike:</p>
+              <div style="background: #1e293b; padding: 15px; border-radius: 6px; margin: 20px 0; border: 1px solid #334155;">
+                <h3 style="margin-top: 0; color: white;">${challengePhoto.title}</h3>
+                <p><strong>Dátum:</strong> ${challengePhoto.taken_at || 'Neznámy'}</p>
+                <p><strong>Miesto:</strong> ${challengePhoto.location || 'Neznáme'}</p>
+                <img src="${challengePhoto.storage_path}" alt="${challengePhoto.title}" style="max-width: 100%; border-radius: 4px; max-height: 300px; object-fit: cover;" />
+              </div>
+              <p>Ak viete, kto je na fotke alebo aké spomienky sa k nej viažu, kliknite na odkaz nižšie a doplňte ich:</p>
+              <a href="${deepLink}" style="display: inline-block; background: #8b5cf6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 10px;">Doplniť informácie</a>
+            </div>
+          `
+        })
+      })
+      .then(async res => {
+        if (res.ok) {
+          setSendingStatus('E-mail bol úspešne odoslaný!');
+          setTimeout(() => setSendingStatus(null), 3000);
+        } else {
+          throw new Error('Resend zlyhal (pravdepodobne CORS)');
+        }
+      })
+      .catch(() => {
+        setSendingStatus('Resend obmedzený CORS. Otváram e-mailový program...');
+        window.open(`mailto:${emailsList}?subject=${subject}&body=${body}`, '_blank');
+        setTimeout(() => setSendingStatus(null), 3000);
+      });
+    } else {
+      window.open(`mailto:${emailsList}?subject=${subject}&body=${body}`, '_blank');
+      setSendingStatus('Otvoril sa e-mailový klient!');
+      setTimeout(() => setSendingStatus(null), 3000);
+    }
+  };
+
+  const handleCopyChatTemplate = () => {
+    if (!challengePhoto) return;
+    const deepLink = window.location.origin + window.location.pathname + '?photo=' + challengePhoto.id;
+    const text = 
+      `📸 *Rodinná výzva: Spoznávate túto spomienku?*\n\n` +
+      `Pomôžte nám doplniť príbeh v našej rodinnej kronike k tejto starej fotke:\n` +
+      `*${challengePhoto.title}*\n` +
+      `📅 Dátum: ${challengePhoto.taken_at || 'Neznámy'}\n` +
+      `📍 Miesto: ${challengePhoto.location || 'Neznáme'}\n\n` +
+      `Ak viete, kto na nej je alebo čo sa vtedy dialo, doplňte to priamo tu:\n` +
+      `👉 ${deepLink}`;
+    
+    navigator.clipboard.writeText(text);
+    setSendingStatus('Šablóna skopírovaná! Vložte ju do WhatsAppu.');
+    setTimeout(() => setSendingStatus(null), 3000);
+  };
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return 'Neznámy dátum';
@@ -334,6 +464,56 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onSelectPhoto,
         </div>
 
       </div>
+
+      {/* PANEL: Výzva týždňa / Spoznaj spomienku */}
+      {challengePhoto && (
+        <div className="panel ai-glow-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '2rem', border: '1px solid rgba(167, 139, 250, 0.2)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+            <div>
+              <h2 className="panel-title" style={{ color: '#a78bfa', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+                <Sparkles size={20} /> Rodinná výzva: Spoznáte túto spomienku?
+              </h2>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.25rem', margin: 0 }}>
+                Našli sme v archíve starú fotografiu, ktorá nemá priradený príbeh alebo označených ľudí. Pomôžte nám zistiť, čo sa vtedy dialo!
+              </p>
+            </div>
+            {userSession && (
+              <button className="btn btn-secondary" style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', height: '28px', display: 'flex', alignItems: 'center', gap: '0.25rem' }} onClick={handleRotateChallenge}>
+                <RotateCw size={12} /> Iná fotka
+              </button>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', cursor: 'pointer' }} onClick={() => onSelectPhoto(challengePhoto)}>
+            <img src={challengePhoto.storage_path} alt={challengePhoto.title} style={{ width: '100px', height: '100px', borderRadius: '6px', objectFit: 'cover', border: '1px solid var(--border-color)' }} />
+            <div style={{ flexGrow: 1, minWidth: '240px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: 'white' }}>{challengePhoto.title}</h3>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <div>🗓️ Rok/Dátum: <strong>{challengePhoto.taken_at || 'Neznámy'}</strong></div>
+                <div>📍 Lokalita: <strong>{challengePhoto.location || 'Neznáma'}</strong></div>
+                <div style={{ color: '#fb7185', fontWeight: 600, marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                  ⚠️ Chýba: {(!challengePhoto.description || challengePhoto.description.length < 10) ? 'Príbeh/Popis' : ''} 
+                  {(!challengePhoto.people || challengePhoto.people.length === 0) ? ((!challengePhoto.description || challengePhoto.description.length < 10) ? ' a označení ľudia' : 'Označení ľudia') : ''}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            {userSession && (
+              <button className="btn btn-primary" onClick={handleSendEmail} style={{ gap: '0.5rem', fontSize: '0.85rem', height: '36px' }}>
+                <Mail size={16} /> Poslať e-mailom rodine
+              </button>
+            )}
+            <button className="btn btn-secondary" onClick={handleCopyChatTemplate} style={{ gap: '0.5rem', fontSize: '0.85rem', height: '36px' }}>
+              <MessageSquare size={16} /> Kopírovať do rodinného četu (WhatsApp)
+            </button>
+            {sendingStatus && (
+              <span style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 600 }}>{sendingStatus}</span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Hlavný obsah nástenky */}
       <div className="dashboard-grid">
