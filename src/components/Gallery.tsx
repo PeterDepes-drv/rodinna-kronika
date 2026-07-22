@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../services/db';
 import type { Photo, Person, AIAnalysisResult, PhotoComment } from '../services/db';
-import { analyzePhoto, fileToBase64 } from '../services/gemini';
-import { Search, Plus, Calendar, MapPin, Users, Trash2, Edit, X, Brain, AlertCircle, Maximize2, Link, MessageSquare } from 'lucide-react';
+import { analyzePhoto, fileToBase64, transcribeAudio } from '../services/gemini';
+import { Search, Plus, Calendar, MapPin, Users, Trash2, Edit, X, Brain, AlertCircle, Maximize2, Link, MessageSquare, Mic, Square, RefreshCw, Check } from 'lucide-react';
 
 interface GalleryProps {
   onSelectPhoto: (photo: Photo) => void;
@@ -141,6 +141,140 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
   const [newCommentAuthor, setNewCommentAuthor] = useState('');
   const [newCommentText, setNewCommentText] = useState('');
   const [showShareToast, setShowShareToast] = useState(false);
+
+  // Nahrávanie zvuku a prepis reči
+  const [isRecording, setIsRecording] = useState(false);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [transcribedText, setTranscribedText] = useState<string | null>(null);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [sendingStatus, setSendingStatus] = useState<string | null>(null);
+
+  const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
+  const recordingIntervalRef = React.useRef<any>(null);
+
+  useEffect(() => {
+    return () => {
+      if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current);
+    };
+  }, []);
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      
+      const chunks: Blob[] = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+      
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        setAudioBlob(blob);
+        const url = URL.createObjectURL(blob);
+        setAudioUrl(url);
+        stream.getTracks().forEach(t => t.stop());
+      };
+      
+      setAudioUrl(null);
+      setAudioBlob(null);
+      setTranscribedText(null);
+      setRecordingDuration(0);
+      setIsRecording(true);
+      
+      recorder.start();
+      
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingDuration(prev => prev + 1);
+      }, 1000);
+      
+    } catch (err) {
+      console.error('Nepodarilo sa spustiť mikrofón:', err);
+      alert('Nepodarilo sa spustiť mikrofón. Uistite sa, že ste povolili prístup k mikrofónu.');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+      }
+    }
+  };
+
+  const handleTranscribeAudio = async () => {
+    if (!audioBlob) return;
+    try {
+      setIsTranscribing(true);
+      
+      const reader = new FileReader();
+      reader.readAsDataURL(audioBlob);
+      reader.onloadend = async () => {
+        const base64 = (reader.result as string).split(',')[1];
+        try {
+          const text = await transcribeAudio(base64, 'audio/webm');
+          setTranscribedText(text);
+        } catch (err) {
+          console.error(err);
+          alert('Prepis reči zlyhal: ' + (err as Error).message);
+        } finally {
+          setIsTranscribing(false);
+        }
+      };
+    } catch (err) {
+      console.error(err);
+      setIsTranscribing(false);
+    }
+  };
+
+  const handleSaveAudioAsDescription = async () => {
+    if (!selectedPhoto || !transcribedText) return;
+    try {
+      const updated = await db.updatePhoto(selectedPhoto.id, { description: transcribedText });
+      onSelectPhoto(updated);
+      loadData();
+      setTranscribedText(null);
+      setAudioUrl(null);
+      setAudioBlob(null);
+      alert('Prepísaný text bol nastavený ako popis spomienky!');
+    } catch (err) {
+      console.error(err);
+      alert('Nepodarilo sa aktualizovať popis.');
+    }
+  };
+
+  const handleSaveAudioAsComment = async () => {
+    if (!selectedPhoto || !transcribedText || !audioBlob) return;
+    try {
+      let finalAudioUrl: string | undefined = undefined;
+      setSendingStatus('Ukladám nahrávku...');
+      try {
+        finalAudioUrl = await db.uploadAudioFile(audioBlob);
+      } catch (err) {
+        console.warn('Nepodarilo sa nahrať audio súbor do úložiska. Komentár sa uloží len ako text.', err);
+      }
+      
+      const author = newCommentAuthor.trim() || (userSession ? userSession.email.split('@')[0] : 'Starý rodič');
+      const text = transcribedText;
+      
+      const added = await db.addComment(selectedPhoto.id, author, text, finalAudioUrl);
+      setPhotoComments(prev => [...prev, added]);
+      setTranscribedText(null);
+      setAudioUrl(null);
+      setAudioBlob(null);
+      setSendingStatus(null);
+      alert('Hlasová spomienka bola uložená ako komentár!');
+    } catch (err) {
+      console.error(err);
+      setSendingStatus(null);
+      alert('Nepodarilo sa uložiť komentár.');
+    }
+  };
 
   const loadPhotoComments = async (photoId: string) => {
     try {
@@ -1201,6 +1335,65 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
                   </p>
                 </div>
 
+                {/* Hlasové nahrávanie a prepis pre starých rodičov */}
+                <div style={{ marginTop: '1.5rem', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '8px', padding: '1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                    <Mic size={18} style={{ color: '#fb7185' }} />
+                    <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, color: 'white' }}>🎙️ Hlasové spomienky starých rodičov</h4>
+                  </div>
+                  
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                    {!isRecording && !audioUrl && (
+                      <button className="btn btn-secondary" onClick={startRecording} style={{ gap: '0.5rem', background: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.2)', color: '#ef4444' }}>
+                        <Mic size={16} /> Spustiť nahrávanie
+                      </button>
+                    )}
+
+                    {isRecording && (
+                      <button className="btn btn-danger" onClick={stopRecording} style={{ gap: '0.5rem', display: 'flex', alignItems: 'center', animation: 'pulse 1.5s infinite' }}>
+                        <Square size={16} /> Zastaviť ({Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, '0')})
+                      </button>
+                    )}
+
+                    {audioUrl && !isRecording && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                          <audio src={audioUrl} controls style={{ height: '36px', maxWidth: '280px' }} />
+                          <button className="btn btn-secondary" onClick={startRecording} style={{ gap: '0.25rem', fontSize: '0.8rem', padding: '0.35rem 0.75rem', height: '36px' }}>
+                            <RefreshCw size={14} /> Nahrať znova
+                          </button>
+                          <button className="btn btn-primary" onClick={handleTranscribeAudio} disabled={isTranscribing} style={{ gap: '0.25rem', fontSize: '0.8rem', padding: '0.35rem 0.75rem', height: '36px' }}>
+                            <Brain size={14} /> {isTranscribing ? 'Prepisujem...' : '✨ Prepísať do textu (AI)'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {transcribedText && (
+                    <div style={{ marginTop: '1rem', background: 'rgba(0, 0, 0, 0.2)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0.85rem' }}>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Náhľad prepísaného textu:</div>
+                      <p style={{ margin: 0, color: 'white', fontStyle: 'italic', fontSize: '0.9rem', lineHeight: '1.4' }}>
+                        "{transcribedText}"
+                      </p>
+                      
+                      <div style={{ display: 'flex', gap: '1rem', marginTop: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                        {userSession && (
+                          <button className="btn btn-primary" onClick={handleSaveAudioAsDescription} style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem', height: '32px' }}>
+                            <Check size={14} /> Nastaviť ako hlavný popis fotky
+                          </button>
+                        )}
+                        <button className="btn btn-secondary" onClick={handleSaveAudioAsComment} style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem', height: '32px' }}>
+                          <MessageSquare size={14} /> Pridať ako komentár so zvukom
+                        </button>
+                        {sendingStatus && (
+                          <span style={{ fontSize: '0.8rem', color: '#38bdf8', fontWeight: 600 }}>{sendingStatus}</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* Označení ľudia */}
                 <div>
                   <div className="meta-item-label" style={{ marginBottom: '0.5rem' }}>Na fotografii</div>
@@ -1266,6 +1459,11 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
                             </span>
                           </div>
                           <p style={{ fontSize: '0.85rem', color: 'var(--text-primary)', margin: 0, whiteSpace: 'pre-wrap' }}>{comment.comment_text}</p>
+                          {comment.audio_url && (
+                            <div style={{ marginTop: '0.4rem' }}>
+                              <audio src={comment.audio_url} controls style={{ height: '24px', maxWidth: '220px' }} />
+                            </div>
+                          )}
                         </div>
                       ))
                     )}

@@ -127,3 +127,65 @@ Uisti sa, že vrátiš IBA čistý, platný JSON. Nevracaj žiadne vysvetlenia m
     throw new Error('AI analýza zlyhala: ' + (error as Error).message);
   }
 }
+
+export async function transcribeAudio(base64Audio: string, mimeType: string = 'audio/webm'): Promise<string> {
+  let apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
+  const storedConfig = localStorage.getItem('gemini_config');
+  if (storedConfig) {
+    try {
+      const parsed = JSON.parse(storedConfig);
+      if (parsed.apiKey) {
+        apiKey = parsed.apiKey;
+      }
+    } catch (e) {
+      console.error('Chyba pri načítaní Gemini kľúča z localStorage', e);
+    }
+  }
+
+  if (!apiKey) {
+    console.log('Gemini API kľúč nie je nastavený. Beží simulovaný prepis reči.');
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    return 'Simulovaný prepis: (Starý otec spomína) Vtedy sme boli všetci na chalupe u strýka Fera v Bojnej. Bolo strašné horúco, deti sa kúpali v kadi a my sme s chlapcami sedeli pod orechom a rozoberali politiku. Krásne časy to boli. (Pre reálny prepis zadajte Gemini API kľúč v Nastaveniach).';
+  }
+
+  try {
+    const model = 'gemini-2.5-flash';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    const prompt = 'Prepíš túto nahrávku hovoreného slova doslova do slovenského textu. Vráť iba čistý prepis v slovenčine bez akýchkoľvek úvodných alebo záverečných viet, poznámok alebo úvodzoviek.';
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: prompt },
+              {
+                inlineData: {
+                  mimeType: mimeType,
+                  data: base64Audio
+                }
+              }
+            ]
+          }
+        ]
+      })
+    });
+
+    if (!response.ok) {
+      const errData = await response.json();
+      throw new Error(errData.error?.message || 'Zlyhalo volanie Gemini API');
+    }
+
+    const resData = await response.json();
+    const responseText = resData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    return responseText.trim();
+  } catch (error) {
+    console.error('Chyba pri prepise zvuku:', error);
+    throw new Error('Prepis zvuku zlyhal: ' + (error as Error).message);
+  }
+}

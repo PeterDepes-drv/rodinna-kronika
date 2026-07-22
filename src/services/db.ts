@@ -31,6 +31,7 @@ export interface PhotoComment {
   author_name: string;
   comment_text: string;
   created_at: string;
+  audio_url?: string;
 }
 
 export interface Person {
@@ -837,13 +838,42 @@ class DatabaseService {
     return [];
   }
 
-  async addComment(photoId: string, authorName: string, commentText: string): Promise<PhotoComment> {
+  async uploadAudioFile(blob: Blob): Promise<string> {
+    if (!this.isUsingSupabase) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    const fileExt = 'webm';
+    const fileName = `audio-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+    const filePath = `uploads/audio/${fileName}`;
+
+    const { error: uploadError } = await this.supabase.storage
+      .from('photos')
+      .upload(filePath, blob, {
+        contentType: 'audio/webm'
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { data } = this.supabase.storage
+      .from('photos')
+      .getPublicUrl(filePath);
+
+    return data.publicUrl;
+  }
+
+  async addComment(photoId: string, authorName: string, commentText: string, audioUrl?: string): Promise<PhotoComment> {
     const newComment: PhotoComment = {
       id: 'c_' + Math.random().toString(36).substr(2, 9),
       photo_id: photoId,
       author_name: authorName,
       comment_text: commentText,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      audio_url: audioUrl
     };
 
     if (this.isUsingSupabase) {
@@ -855,7 +885,22 @@ class DatabaseService {
         if (error) throw error;
         return data[0] as PhotoComment;
       } catch (err) {
-        console.warn('Nepodarilo sa uložiť komentár do Supabase. Ukladám lokálne...', err);
+        console.warn('Nepodarilo sa vložiť komentár s audio_url do Supabase (chýba stĺpec). Skúšam fallback...', err);
+        const { audio_url, ...omittedComment } = newComment;
+        let fallbackText = commentText;
+        if (audioUrl) {
+          fallbackText += `\n\n🔊 Hlasová nahrávka: ${audioUrl}`;
+        }
+        try {
+          const { data, error } = await this.supabase
+            .from('comments')
+            .insert([{ ...omittedComment, comment_text: fallbackText }])
+            .select();
+          if (error) throw error;
+          return { ...data[0], audio_url: audioUrl } as PhotoComment;
+        } catch (retryErr) {
+          console.error('Zlyhalo aj náhradné uloženie do Supabase. Ukladám lokálne...', retryErr);
+        }
       }
     }
 
