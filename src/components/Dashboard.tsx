@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { db } from '../services/db';
 import type { Photo, Person } from '../services/db';
-import { Image, Users, BookOpen, Calendar, MapPin, Play, Gift, Sparkles, Clock, RotateCw, Mail, MessageSquare } from 'lucide-react';
+import { Image, Users, BookOpen, Calendar, MapPin, Play, Gift, Sparkles, Clock, RotateCw, Mail, MessageSquare, Brain } from 'lucide-react';
 
 interface DashboardProps {
   onNavigate: (view: string) => void;
@@ -39,6 +39,94 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onSelectPhoto,
   const [loading, setLoading] = useState(true);
   const [allPhotos, setAllPhotos] = useState<Photo[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
+  const [dashboardTab, setDashboardTab] = useState<'overview' | 'insights'>('overview');
+
+  const getInsightsData = () => {
+    const total = allPhotos.length || 1;
+
+    // 1. Dekády
+    const decadesMap: Record<number, number> = {};
+    allPhotos.forEach(p => {
+      const dec = p.decade;
+      decadesMap[dec] = (decadesMap[dec] || 0) + 1;
+    });
+    const decadesStats = Object.keys(decadesMap)
+      .map(Number)
+      .map(dec => ({
+        decade: dec,
+        count: decadesMap[dec],
+        percentage: Math.round((decadesMap[dec] / total) * 100)
+      }))
+      .sort((a, b) => b.decade - a.decade);
+
+    // 2. Najčastejšie fotení
+    const peopleMap: Record<string, number> = {};
+    allPhotos.forEach(p => {
+      if (p.people) {
+        p.people.forEach(pid => {
+          peopleMap[pid] = (peopleMap[pid] || 0) + 1;
+        });
+      }
+    });
+    const maxPersonCount = Math.max(...Object.values(peopleMap), 1);
+    const topPeople = Object.keys(peopleMap)
+      .map(pid => {
+        const person = people.find(pers => pers.id === pid);
+        return {
+          id: pid,
+          name: person ? person.name : 'Neznámy člen',
+          photo_url: person ? person.photo_url : null,
+          count: peopleMap[pid],
+          percentage: Math.round((peopleMap[pid] / maxPersonCount) * 100)
+        };
+      })
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    // 3. Lokality
+    const locMap: Record<string, number> = {};
+    allPhotos.forEach(p => {
+      if (p.location && p.location.trim().length > 0 && p.location !== 'Neznáme miesto') {
+        const loc = p.location.trim();
+        locMap[loc] = (locMap[loc] || 0) + 1;
+      }
+    });
+    const maxLocCount = Math.max(...Object.values(locMap), 1);
+    const topLocations = Object.keys(locMap)
+      .map(loc => ({
+        name: loc,
+        count: locMap[loc],
+        percentage: Math.round((locMap[loc] / maxLocCount) * 100)
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    // 4. AI Tagy
+    const tagMap: Record<string, number> = {};
+    allPhotos.forEach(p => {
+      if (p.ai_metadata?.tags) {
+        p.ai_metadata.tags.forEach(tag => {
+          tagMap[tag] = (tagMap[tag] || 0) + 1;
+        });
+      }
+    });
+    const maxTagCount = Math.max(...Object.values(tagMap), 1);
+    const topTags = Object.keys(tagMap)
+      .map(tag => ({
+        name: tag,
+        count: tagMap[tag],
+        percentage: Math.round((tagMap[tag] / maxTagCount) * 100)
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    return {
+      decadesStats,
+      topPeople,
+      topLocations,
+      topTags
+    };
+  };
 
   // Stavy pre kalendár a výročia
   const [upcomingBirthdays, setUpcomingBirthdays] = useState<BirthdayItem[]>([]);
@@ -398,9 +486,52 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onSelectPhoto,
 
   return (
     <div>
-      <div style={{ marginBottom: '2.5rem' }}>
-        <h1>Ahoj v našej rodinnej kronike</h1>
-        <p>Uchovávame spomienky a históriu našej rodiny pre budúce generácie.</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h1>Ahoj v našej rodinnej kronike</h1>
+          <p>Uchovávame spomienky a históriu našej rodiny pre budúce generácie.</p>
+        </div>
+        
+        <div style={{ display: 'flex', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', padding: '0.25rem', borderRadius: '12px', gap: '0.25rem' }}>
+          <button 
+            type="button"
+            className="btn" 
+            onClick={() => setDashboardTab('overview')}
+            style={{ 
+              fontSize: '0.85rem', 
+              padding: '0.5rem 1rem', 
+              borderRadius: '8px', 
+              background: dashboardTab === 'overview' ? 'var(--accent)' : 'transparent',
+              color: 'white',
+              border: 'none',
+              fontWeight: 600,
+              cursor: 'pointer',
+              boxShadow: dashboardTab === 'overview' ? '0 4px 10px rgba(167, 139, 250, 0.25)' : 'none',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            📋 Aktuality a prehľad
+          </button>
+          <button 
+            type="button"
+            className="btn" 
+            onClick={() => setDashboardTab('insights')}
+            style={{ 
+              fontSize: '0.85rem', 
+              padding: '0.5rem 1rem', 
+              borderRadius: '8px', 
+              background: dashboardTab === 'insights' ? 'var(--accent)' : 'transparent',
+              color: 'white',
+              border: 'none',
+              fontWeight: 600,
+              cursor: 'pointer',
+              boxShadow: dashboardTab === 'insights' ? '0 4px 10px rgba(167, 139, 250, 0.25)' : 'none',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            📊 Rodinné štatistiky
+          </button>
+        </div>
       </div>
 
       {/* Riadok so štatistikami */}
@@ -436,8 +567,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onSelectPhoto,
         </div>
       </div>
 
-      {/* PANEL: Kalendár rodinných výročí (Ročný súhrn) */}
-      <div className="panel" style={{ marginTop: '2rem' }}>
+      {dashboardTab === 'overview' && (
+        <>
+          {/* PANEL: Kalendár rodinných výročí (Ročný súhrn) */}
+          <div className="panel" style={{ marginTop: '2rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
           <h2 className="panel-title" style={{ color: '#c084fc', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Calendar size={22} /> Kalendár rodinných výročí (V tento mesiac)
@@ -797,6 +930,121 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onSelectPhoto,
           </div>
         </div>
       </div>
+      </>)}
+
+      {dashboardTab === 'insights' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2rem', marginTop: '2rem' }}>
+          {(() => {
+            const { decadesStats, topPeople, topLocations, topTags } = getInsightsData();
+            return (
+              <>
+                {/* 1. DEKÁDY */}
+                <div className="panel" style={{ display: 'flex', flexDirection: 'column' }}>
+                  <h2 className="panel-title" style={{ color: '#a78bfa', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Clock size={20} /> Spomienky v čase (Dekády)
+                  </h2>
+                  {decadesStats.length === 0 ? (
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Žiadne dáta o rokoch fotenia.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                      {decadesStats.map(stat => (
+                        <div key={stat.decade}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginBottom: '0.35rem' }}>
+                            <span style={{ fontWeight: 600, color: 'white' }}>{stat.decade}-te roky</span>
+                            <span style={{ color: 'var(--text-secondary)' }}>{stat.count} {stat.count === 1 ? 'fotka' : (stat.count >= 2 && stat.count <= 4) ? 'fotky' : 'fotiek'} ({stat.percentage}%)</span>
+                          </div>
+                          <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
+                            <div style={{ width: `${stat.percentage}%`, height: '100%', background: 'linear-gradient(90deg, #c084fc 0%, #a78bfa 100%)', borderRadius: '4px' }}></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. NAJČASTEJŠIE FOTENÍ */}
+                <div className="panel" style={{ display: 'flex', flexDirection: 'column' }}>
+                  <h2 className="panel-title" style={{ color: '#fb7185', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Users size={20} /> Najčastejšie fotografovaní
+                  </h2>
+                  {topPeople.length === 0 ? (
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Žiadni rodinní príslušníci nie sú označení na fotkách.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                      {topPeople.map(p => (
+                        <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <img 
+                            src={p.photo_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100'} 
+                            alt={p.name} 
+                            style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border-color)' }}
+                          />
+                          <div style={{ flexGrow: 1 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginBottom: '0.25rem' }}>
+                              <span style={{ fontWeight: 600, color: 'white' }}>{p.name}</span>
+                              <span style={{ color: 'var(--text-secondary)' }}>{p.count}x na fotke</span>
+                            </div>
+                            <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
+                              <div style={{ width: `${p.percentage}%`, height: '100%', background: 'linear-gradient(90deg, #fb7185 0%, #f43f5e 100%)', borderRadius: '3px' }}></div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. LOKALITY */}
+                <div className="panel" style={{ display: 'flex', flexDirection: 'column' }}>
+                  <h2 className="panel-title" style={{ color: '#34d399', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <MapPin size={20} /> Hlavné miesta spomienok
+                  </h2>
+                  {topLocations.length === 0 ? (
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Žiadne fotky s vyplnenou lokalitou.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                      {topLocations.map(loc => (
+                        <div key={loc.name}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginBottom: '0.35rem' }}>
+                            <span style={{ fontWeight: 600, color: 'white' }}>{loc.name}</span>
+                            <span style={{ color: 'var(--text-secondary)' }}>{loc.count}x</span>
+                          </div>
+                          <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
+                            <div style={{ width: `${loc.percentage}%`, height: '100%', background: 'linear-gradient(90deg, #34d399 0%, #10b981 100%)', borderRadius: '3px' }}></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 4. AI TAGY */}
+                <div className="panel" style={{ display: 'flex', flexDirection: 'column' }}>
+                  <h2 className="panel-title" style={{ color: '#38bdf8', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Brain size={20} /> Časté témy (AI Analýza)
+                  </h2>
+                  {topTags.length === 0 ? (
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Zatiaľ neboli analyzované žiadne fotky pomocou Gemini AI.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                      {topTags.map(tag => (
+                        <div key={tag.name}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginBottom: '0.35rem' }}>
+                            <span style={{ fontWeight: 600, color: 'white' }}>#{tag.name}</span>
+                            <span style={{ color: 'var(--text-secondary)' }}>{tag.count}x</span>
+                          </div>
+                          <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
+                            <div style={{ width: `${tag.percentage}%`, height: '100%', background: 'linear-gradient(90deg, #38bdf8 0%, #0ea5e9 100%)', borderRadius: '3px' }}></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            );
+          })()}
+        </div>
+      )}
     </div>
   );
 };
