@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../services/db';
-import type { Photo, Person, AIAnalysisResult } from '../services/db';
+import type { Photo, Person, AIAnalysisResult, PhotoComment } from '../services/db';
 import { analyzePhoto, fileToBase64 } from '../services/gemini';
-import { Search, Plus, Calendar, MapPin, Users, Trash2, Edit, X, Brain, AlertCircle, Maximize2 } from 'lucide-react';
+import { Search, Plus, Calendar, MapPin, Users, Trash2, Edit, X, Brain, AlertCircle, Maximize2, Link, MessageSquare } from 'lucide-react';
 
 interface GalleryProps {
   onSelectPhoto: (photo: Photo) => void;
@@ -119,7 +119,8 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
   // Filtre
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDecade, setSelectedDecade] = useState<string>('all');
-  const [selectedPersonId, setSelectedPersonId] = useState<string>('all');
+  const [selectedPersonIds, setSelectedPersonIds] = useState<string[]>([]);
+  const [matchAllPeople, setMatchAllPeople] = useState(false);
   const [selectedTag, setSelectedTag] = useState<string>('all');
 
   // Modály
@@ -134,6 +135,35 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
   // AI loading
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+
+  // Komentáre a zdieľanie
+  const [photoComments, setPhotoComments] = useState<PhotoComment[]>([]);
+  const [newCommentAuthor, setNewCommentAuthor] = useState('');
+  const [newCommentText, setNewCommentText] = useState('');
+  const [showShareToast, setShowShareToast] = useState(false);
+
+  const loadPhotoComments = async (photoId: string) => {
+    try {
+      const comments = await db.getComments(photoId);
+      setPhotoComments(comments);
+    } catch (e) {
+      console.warn('Nepodarilo sa načítať komentáre:', e);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedPhoto) {
+      loadPhotoComments(selectedPhoto.id);
+      if (userSession?.email) {
+        setNewCommentAuthor(userSession.email.split('@')[0]);
+      } else {
+        setNewCommentAuthor('');
+      }
+      setNewCommentText('');
+    } else {
+      setPhotoComments([]);
+    }
+  }, [selectedPhoto, userSession]);
 
   // Formulárové stavy pre pridanie/editáciu
   const [formData, setFormData] = useState({
@@ -222,7 +252,13 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
     const matchesDecade = selectedDecade === 'all' || photo.decade.toString() === selectedDecade;
 
     // Person filter
-    const matchesPerson = selectedPersonId === 'all' || (photo.people && photo.people.includes(selectedPersonId));
+    const matchesPerson = 
+      selectedPersonIds.length === 0 || 
+      (photo.people && (
+        matchAllPeople
+          ? selectedPersonIds.every(pid => photo.people?.includes(pid))
+          : selectedPersonIds.some(pid => photo.people?.includes(pid))
+      ));
 
     // Tag filter
     const matchesTag = selectedTag === 'all' || (photo.ai_metadata?.tags && photo.ai_metadata.tags.includes(selectedTag));
@@ -600,17 +636,6 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
 
           <select 
             className="select-field"
-            value={selectedPersonId}
-            onChange={(e) => setSelectedPersonId(e.target.value)}
-          >
-            <option value="all">Všetci ľudia</option>
-            {people.map(p => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
-
-          <select 
-            className="select-field"
             value={selectedTag}
             onChange={(e) => setSelectedTag(e.target.value)}
           >
@@ -619,6 +644,66 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
               <option key={t} value={t}>{t}</option>
             ))}
           </select>
+        </div>
+      </div>
+
+      {/* Vizuálny filter ľudí (Pokročilé filtre) */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '2rem', background: 'rgba(30, 27, 75, 0.2)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0.85rem 1.25rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Filtrovať podľa osôb (vyberte jedného alebo viacerých príbuzných):</span>
+          {selectedPersonIds.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <label style={{ fontSize: '0.8rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontWeight: 500 }}>
+                <input 
+                  type="checkbox" 
+                  checked={matchAllPeople} 
+                  onChange={(e) => setMatchAllPeople(e.target.checked)} 
+                  style={{ cursor: 'pointer' }}
+                /> 
+                Zobraziť len fotky kde sú všetci naraz (AND)
+              </label>
+              <button className="btn btn-secondary" style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', height: 'auto' }} onClick={() => setSelectedPersonIds([])}>
+                Vymazať filter ({selectedPersonIds.length})
+              </button>
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+          {people.map(p => {
+            const isSelected = selectedPersonIds.includes(p.id);
+            return (
+              <div 
+                key={p.id}
+                onClick={() => {
+                  if (isSelected) {
+                    setSelectedPersonIds(prev => prev.filter(id => id !== p.id));
+                  } else {
+                    setSelectedPersonIds(prev => [...prev, p.id]);
+                  }
+                }}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '0.45rem', 
+                  padding: '0.35rem 0.75rem', 
+                  borderRadius: '20px', 
+                  border: isSelected ? '1px solid #a78bfa' : '1px solid var(--border-color)', 
+                  background: isSelected ? 'rgba(167, 139, 250, 0.2)' : 'rgba(255,255,255,0.02)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  fontSize: '0.8rem',
+                  color: isSelected ? 'white' : 'var(--text-secondary)'
+                }}
+              >
+                <img 
+                  src={p.photo_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100'} 
+                  alt={p.name} 
+                  style={{ width: '22px', height: '22px', borderRadius: '50%', objectFit: 'cover', border: isSelected ? '1px solid #a78bfa' : '1px solid transparent' }} 
+                />
+                <span style={{ fontWeight: isSelected ? 600 : 400 }}>{p.name}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -1033,16 +1118,37 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
             {/* Pravá strana: Detail alebo Editácia */}
             {!isEditMode ? (
               <div className="modal-details-section">
-                <div className="modal-header">
-                  <div>
-                    <h2 style={{ fontSize: '1.6rem' }}>{selectedPhoto.title}</h2>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                      Pridané {new Date(selectedPhoto.created_at).toLocaleDateString('sk-SK')}
-                    </p>
+                <div className="modal-header" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'flex-start' }}>
+                    <div>
+                      <h2 style={{ fontSize: '1.6rem' }}>{selectedPhoto.title}</h2>
+                      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                        Pridané {new Date(selectedPhoto.created_at).toLocaleDateString('sk-SK')}
+                      </p>
+                    </div>
+                    <button className="modal-close-btn" onClick={onClosePhotoDetail}>
+                      <X size={24} />
+                    </button>
                   </div>
-                  <button className="modal-close-btn" onClick={onClosePhotoDetail}>
-                    <X size={24} />
-                  </button>
+
+                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginTop: '-0.25rem' }}>
+                    <button 
+                      type="button" 
+                      className="btn btn-secondary" 
+                      style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem', height: '28px' }}
+                      onClick={() => {
+                        const url = window.location.origin + window.location.pathname + '?photo=' + selectedPhoto.id;
+                        navigator.clipboard.writeText(url);
+                        setShowShareToast(true);
+                        setTimeout(() => setShowShareToast(false), 2000);
+                      }}
+                    >
+                      <Link size={12} /> Kopírovať odkaz
+                    </button>
+                    {showShareToast && (
+                      <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 600 }}>Odkaz skopírovaný!</span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="metadata-grid">
@@ -1140,6 +1246,72 @@ export const Gallery: React.FC<GalleryProps> = ({ onSelectPhoto, selectedPhoto, 
                     )}
                   </div>
                 )}
+                {/* Komentáre a príbehy rodiny */}
+                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)', fontWeight: 600 }}>
+                    <MessageSquare size={16} /> Spomienky a komentáre ({photoComments.length})
+                  </div>
+                  
+                  {/* Zoznam komentárov */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '180px', overflowY: 'auto', paddingRight: '0.25rem' }}>
+                    {photoComments.length === 0 ? (
+                      <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Zatiaľ žiadne komentáre. Pridajte svoju spomienku ako prvý!</p>
+                    ) : (
+                      photoComments.map((comment) => (
+                        <div key={comment.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px', padding: '0.6rem 0.75rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#a78bfa' }}>{comment.author_name}</span>
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                              {new Date(comment.created_at).toLocaleDateString('sk-SK', { day: 'numeric', month: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          <p style={{ fontSize: '0.85rem', color: 'var(--text-primary)', margin: 0, whiteSpace: 'pre-wrap' }}>{comment.comment_text}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Formulár pre komentár */}
+                  <form 
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (!newCommentAuthor.trim() || !newCommentText.trim()) return;
+                      try {
+                        const added = await db.addComment(selectedPhoto.id, newCommentAuthor.trim(), newCommentText.trim());
+                        setPhotoComments(prev => [...prev, added]);
+                        setNewCommentText('');
+                      } catch (err) {
+                        console.error(err);
+                        alert('Nepodarilo sa pridať komentár.');
+                      }
+                    }} 
+                    style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.25rem' }}
+                  >
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <input 
+                        type="text" 
+                        placeholder="Vaše meno (napr. Strýko Peter)" 
+                        className="input-field" 
+                        style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem', height: '32px', paddingLeft: '0.75rem' }}
+                        required
+                        value={newCommentAuthor}
+                        disabled={!!userSession}
+                        onChange={(e) => setNewCommentAuthor(e.target.value)}
+                      />
+                    </div>
+                    <textarea 
+                      placeholder="Sem napíšte svoje spomienky alebo info k fotke..." 
+                      className="textarea-field" 
+                      style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem', minHeight: '50px', height: '50px' }}
+                      required
+                      value={newCommentText}
+                      onChange={(e) => setNewCommentText(e.target.value)}
+                    />
+                    <button type="submit" className="btn btn-primary" style={{ alignSelf: 'flex-end', fontSize: '0.8rem', padding: '0.3rem 1rem', height: '32px' }}>
+                      Pridať komentár
+                    </button>
+                  </form>
+                </div>
 
                 {userSession && (
                   <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>

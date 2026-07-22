@@ -28,6 +28,7 @@ import { Presentations } from './components/Presentations';
 import { ImportPhotos } from './components/ImportPhotos';
 import { Settings } from './components/Settings';
 import { MapMemories } from './components/MapMemories';
+import { db } from './services/db';
 import type { Photo } from './services/db';
 import { authService } from './services/auth';
 import type { UserSession } from './services/auth';
@@ -46,6 +47,27 @@ function App() {
       setUserSession(session);
     });
     return unsubscribe;
+  }, []);
+
+  // Spracovanie hlbokých odkazov pri štarte (?photo=ID)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const photoId = params.get('photo');
+    if (photoId) {
+      const loadLinkedPhoto = async () => {
+        try {
+          const photosList = await db.getPhotos();
+          const found = photosList.find((p: Photo) => p.id === photoId);
+          if (found) {
+            setSelectedPhoto(found);
+            setActiveView('gallery');
+          }
+        } catch (e) {
+          console.error('Nepodarilo sa načítať odkazovanú fotografiu:', e);
+        }
+      };
+      loadLinkedPhoto();
+    }
   }, []);
 
   // Stavy pre celoobrazovkovú prezentáciu (Slideshow)

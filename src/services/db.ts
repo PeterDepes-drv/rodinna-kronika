@@ -25,6 +25,14 @@ export interface Photo {
   people?: string[]; // Zoznam ID označených ľudí
 }
 
+export interface PhotoComment {
+  id: string;
+  photo_id: string;
+  author_name: string;
+  comment_text: string;
+  created_at: string;
+}
+
 export interface Person {
   id: string;
   name: string;
@@ -33,6 +41,9 @@ export interface Person {
   photo_url?: string;
   bio?: string;
   created_at?: string;
+  father_id?: string;
+  mother_id?: string;
+  spouse_id?: string;
 }
 
 export interface Album {
@@ -528,7 +539,22 @@ class DatabaseService {
         .select('*')
         .order('name');
       if (error) throw error;
-      return data as Person[];
+
+      const localRelsRaw = localStorage.getItem('kronika_local_relationships');
+      const localRels = localRelsRaw ? JSON.parse(localRelsRaw) : {};
+
+      const people = (data as Person[]).map(p => {
+        if (localRels[p.id]) {
+          return {
+            ...p,
+            father_id: p.father_id || localRels[p.id].father_id,
+            mother_id: p.mother_id || localRels[p.id].mother_id,
+            spouse_id: p.spouse_id || localRels[p.id].spouse_id
+          };
+        }
+        return p;
+      });
+      return people;
     } else {
       const local = localStorage.getItem('kronika_people');
       return local ? JSON.parse(local) : [];
@@ -544,12 +570,29 @@ class DatabaseService {
     };
 
     if (this.isUsingSupabase) {
-      const { data, error } = await this.supabase
-        .from('people')
-        .insert([newPerson])
-        .select();
-      if (error) throw error;
-      return data[0] as Person;
+      try {
+        const { data, error } = await this.supabase
+          .from('people')
+          .insert([newPerson])
+          .select();
+        if (error) throw error;
+        return data[0] as Person;
+      } catch (err) {
+        console.warn('Nepodarilo sa uložiť vzťahy do Supabase. Ukladám lokálne...', err);
+        const { father_id, mother_id, spouse_id, ...supabasePerson } = newPerson as any;
+        const { data, error } = await this.supabase
+          .from('people')
+          .insert([supabasePerson])
+          .select();
+        if (error) throw error;
+
+        const localRelsRaw = localStorage.getItem('kronika_local_relationships');
+        const localRels = localRelsRaw ? JSON.parse(localRelsRaw) : {};
+        localRels[newId] = { father_id, mother_id, spouse_id };
+        localStorage.setItem('kronika_local_relationships', JSON.stringify(localRels));
+
+        return { ...data[0], father_id, mother_id, spouse_id } as Person;
+      }
     } else {
       const people = await this.getPeople();
       people.push(newPerson);
@@ -560,13 +603,41 @@ class DatabaseService {
 
   async updatePerson(id: string, updates: Partial<Omit<Person, 'id'>>): Promise<Person> {
     if (this.isUsingSupabase) {
-      const { data, error } = await this.supabase
-        .from('people')
-        .update(updates)
-        .eq('id', id)
-        .select();
-      if (error) throw error;
-      return data[0] as Person;
+      try {
+        const { data, error } = await this.supabase
+          .from('people')
+          .update(updates)
+          .eq('id', id)
+          .select();
+        if (error) throw error;
+        return data[0] as Person;
+      } catch (err) {
+        console.warn('Nepodarilo sa aktualizovať vzťahy v Supabase. Ukladám lokálne...', err);
+        const { father_id, mother_id, spouse_id, ...supabaseUpdates } = updates as any;
+        const { data, error } = await this.supabase
+          .from('people')
+          .update(supabaseUpdates)
+          .eq('id', id)
+          .select();
+        if (error) throw error;
+
+        const localRelsRaw = localStorage.getItem('kronika_local_relationships');
+        const localRels = localRelsRaw ? JSON.parse(localRelsRaw) : {};
+        localRels[id] = {
+          ...localRels[id],
+          father_id: father_id !== undefined ? father_id : localRels[id]?.father_id,
+          mother_id: mother_id !== undefined ? mother_id : localRels[id]?.mother_id,
+          spouse_id: spouse_id !== undefined ? spouse_id : localRels[id]?.spouse_id
+        };
+        localStorage.setItem('kronika_local_relationships', JSON.stringify(localRels));
+
+        return {
+          ...data[0],
+          father_id: father_id !== undefined ? father_id : localRels[id]?.father_id,
+          mother_id: mother_id !== undefined ? mother_id : localRels[id]?.mother_id,
+          spouse_id: spouse_id !== undefined ? spouse_id : localRels[id]?.spouse_id
+        } as Person;
+      }
     } else {
       const people = await this.getPeople();
       const idx = people.findIndex(p => p.id === id);
@@ -742,6 +813,59 @@ class DatabaseService {
     }
   }
 
+  // --- METÓDY PRE KOMENTÁRE (Comments) ---
+  async getComments(photoId: string): Promise<PhotoComment[]> {
+    if (this.isUsingSupabase) {
+      try {
+        const { data, error } = await this.supabase
+          .from('comments')
+          .select('*')
+          .eq('photo_id', photoId)
+          .order('created_at', { ascending: true });
+        if (error) throw error;
+        return data as PhotoComment[];
+      } catch (err) {
+        console.warn('Nepodarilo sa stiahnuť komentáre zo Supabase. Načítavam lokálne...', err);
+      }
+    }
+    
+    const localComments = localStorage.getItem('kronika_comments');
+    if (localComments) {
+      const parsed = JSON.parse(localComments) as PhotoComment[];
+      return parsed.filter(c => c.photo_id === photoId).sort((a, b) => a.created_at.localeCompare(b.created_at));
+    }
+    return [];
+  }
+
+  async addComment(photoId: string, authorName: string, commentText: string): Promise<PhotoComment> {
+    const newComment: PhotoComment = {
+      id: 'c_' + Math.random().toString(36).substr(2, 9),
+      photo_id: photoId,
+      author_name: authorName,
+      comment_text: commentText,
+      created_at: new Date().toISOString()
+    };
+
+    if (this.isUsingSupabase) {
+      try {
+        const { data, error } = await this.supabase
+          .from('comments')
+          .insert([newComment])
+          .select();
+        if (error) throw error;
+        return data[0] as PhotoComment;
+      } catch (err) {
+        console.warn('Nepodarilo sa uložiť komentár do Supabase. Ukladám lokálne...', err);
+      }
+    }
+
+    const localCommentsRaw = localStorage.getItem('kronika_comments');
+    const localComments = localCommentsRaw ? JSON.parse(localCommentsRaw) : [];
+    localComments.push(newComment);
+    localStorage.setItem('kronika_comments', JSON.stringify(localComments));
+    return newComment;
+  }
+
   // --- KOPÍROVANIE / NÁHRADA LOKÁLNYCH DÁT ZA SUPABASE ---
   async exportBackup(): Promise<string> {
     const photos = await this.getPhotos();
@@ -758,13 +882,32 @@ class DatabaseService {
       albumPhotos = JSON.parse(localStorage.getItem('kronika_album_photos') || '{}');
     }
 
+    let comments: PhotoComment[] = [];
+    if (this.isUsingSupabase) {
+      try {
+        const { data } = await this.supabase.from('comments').select('*');
+        if (data) comments = data as PhotoComment[];
+      } catch {
+        // ignore
+      }
+    }
+    const localCommentsRaw = localStorage.getItem('kronika_comments');
+    const localComments = localCommentsRaw ? JSON.parse(localCommentsRaw) : [];
+    const combinedComments = [...comments];
+    localComments.forEach((lc: PhotoComment) => {
+      if (!combinedComments.some(cc => cc.id === lc.id)) {
+        combinedComments.push(lc);
+      }
+    });
+
     const backup = {
       version: '1.0',
       timestamp: new Date().toISOString(),
       photos,
       people,
       albums,
-      albumPhotos
+      albumPhotos,
+      comments: combinedComments
     };
 
     return JSON.stringify(backup, null, 2);
@@ -778,13 +921,15 @@ class DatabaseService {
       }
 
       if (this.isUsingSupabase) {
-        // Pre Supabase by sme museli spustiť migračný upload
         throw new Error('Import do živej databázy Supabase cez zálohu nie je momentálne podporovaný priamo z UI. Použite lokálny režim.');
       } else {
         localStorage.setItem('kronika_photos', JSON.stringify(backup.photos));
         localStorage.setItem('kronika_people', JSON.stringify(backup.people));
         localStorage.setItem('kronika_albums', JSON.stringify(backup.albums));
         localStorage.setItem('kronika_album_photos', JSON.stringify(backup.albumPhotos || {}));
+        if (backup.comments) {
+          localStorage.setItem('kronika_comments', JSON.stringify(backup.comments));
+        }
       }
     } catch (e) {
       console.error(e);
@@ -792,12 +937,13 @@ class DatabaseService {
     }
   }
 
-  // Vymazať LocalStorage (reset do pôvodného stavu)
   clearLocalDb() {
     localStorage.removeItem('kronika_photos');
     localStorage.removeItem('kronika_people');
     localStorage.removeItem('kronika_albums');
     localStorage.removeItem('kronika_album_photos');
+    localStorage.removeItem('kronika_comments');
+    localStorage.removeItem('kronika_local_relationships');
     this.initLocalStorageMock();
   }
 }
